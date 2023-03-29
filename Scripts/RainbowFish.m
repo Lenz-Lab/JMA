@@ -192,8 +192,8 @@ Pspm.vertices   = TT.Points*1.2;
 bone_center = incenter(Bone);
 bone_normal = faceNormal(Bone);
 
-% figure('visible','off')
-figure()
+figure('visible','off')
+% figure()
 patch(B,'FaceColor', [0.85 0.85 0.85], ...
 'EdgeColor','none',...        
 'FaceLighting','gouraud',...

@@ -1,4 +1,4 @@
-function [sig_stance] = SPM_Analysis(data1,name1,data2,name2,comparison,y_label,y_lim,val,perc_stance,color_plot,suppress)
+function [sig_stance] = SPM_Analysis(data1,name1,data2,name2,comparison,y_label,y_lim,val,perc_stance,color_plot,alpha_val,suppress)
 % SPM_Analysis(data1,name1,data2,name2,comparison)
 % This function performs a Statistical Parametric Analysis and plots the
 % regions of statistical signficance. The script utilizing this function
@@ -42,13 +42,13 @@ function [sig_stance] = SPM_Analysis(data1,name1,data2,name2,comparison,y_label,
 % SPM Analysis - T-Test
 if comparison == 1
     spm       = spm1d.stats.ttest2(data1,data2);
-    spmi      = spm.inference(0.05, 'two_tailed',true, 'interp',true);
+    spmi      = spm.inference(alpha_val, 'two_tailed',true, 'interp',true);
 end
 
 % SPM Analysis - T-Test Paired
 if comparison == 2
     spm       = spm1d.stats.ttest_paired(data1,data2);
-    spmi      = spm.inference(0.05, 'two_tailed',true, 'interp',true);
+    spmi      = spm.inference(alpha_val, 'two_tailed',true, 'interp',true);
 end
 
 %% Plotting the SPM

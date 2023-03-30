@@ -248,6 +248,15 @@ for g_count = 1:length(g)
     end
 end
 
+%% Report Normality
+for n = 1:length(inpdata)
+    if not_normal.(string(g(inpdata(n)))) == 0
+        fprintf('Normality Test %s: Nonparametric',string(g(inpdata(n))))
+    elseif not_normal.(string(g(inpdata(n)))) == 1
+        fprintf('Normality Test %s: Parametric',string(g(inpdata(n))))
+    end
+end
+
 %% Creates SPM Figures
 % Will create figures for congruence index and distance
 close all

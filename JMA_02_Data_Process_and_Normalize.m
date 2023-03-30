@@ -26,6 +26,7 @@ study_num  = inp_ui{3};
 %% Selecting Data
 fldr_name = cell(str2double(study_num),1);
 for n = 1:str2double(study_num)
+    uiwait(msgbox(sprintf('Please select the %d study group',n)))
     fldr_name{n} = uigetdir;
     addpath(fldr_name{n})
 end
@@ -346,12 +347,44 @@ subjects = subj_group.(string(g(study_pop))).SubjectList;
     end
 end
 
+%% Save Coverage Areas to Spreadsheet
+g = fieldnames(Data);
+for g_count = 1:length(g)
+    gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
+    templength(g_count) = length(gg);  
+end
+
+surf_area = cell(max(templength)+2,g_count);
+g = fieldnames(Data);
+if length(Data.(string(g(g_count))).CoverageArea.F_1) == 1
+    for g_count = 1:length(g)
+        gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
+        surf_area{1,g_count} = string(g(g_count));
+        surf_area{2,g_count} = string(bone_names(1));
+        for frame_count = 1:length(gg)
+            surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+        end
+    end
+elseif length(Data.(string(g(g_count))).CoverageArea.F_1) == 2
+    g_spacer = 1:2:2*length(g);
+    for g_count = 1:length(g)
+        gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
+        surf_area{1,g_spacer(g_count)} = string(g(g_count));
+        surf_area{2,g_spacer(g_count)} = string(bone_names(1));
+        surf_area{2,g_spacer(g_count)+1} = string(bone_names(2));
+        for frame_count = 1:length(gg)
+            surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+            surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
+        end
+    end
+end
+
 %% Save Data to .mat Files
 fprintf('Saving Results\n')
 
-MF = dir(fullfile(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\',pwd)));
+MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd)));
 if isempty(MF) == 1
-    mkdir(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\',pwd));
+    mkdir(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd));
 end
 
 perc_temp           = IntData.(string(subjects(1))).Frame(:,1);
@@ -376,5 +409,7 @@ for n = 1:length(g)
     temp_name = strcat(temp_name,temp_n);
 end
 
-save(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\',pwd,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
+writecell(surf_area,sprintf('%s\\MAT_Files\\JMA_02_Outputs\\%s',pwd,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
+
+save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
 fprintf('Complete!\n')

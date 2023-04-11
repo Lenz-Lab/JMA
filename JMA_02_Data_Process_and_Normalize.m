@@ -81,7 +81,12 @@ MeanCP = length(Data.(string(g(1))).(string(bone_names(1))).CP(:,1));
 
 %% Normalize Data
 for subj_count = 1:length(subjects)
-    frames = Data.(string(subjects(subj_count))).Event;
+    if isfield(Data.(string(subjects(subj_count))),'Event') == 1
+        frames = Data.(string(subjects(subj_count))).Event;
+    else
+        frames = [1 1 1 1];
+    end
+    
     k = 1;
     if frames(:,4) > frames(:,1)
         for m = frames(:,1):frames(:,4)
@@ -132,7 +137,12 @@ for n = 1:length(subjects)
         g = fieldnames(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data);
         for k = 1:length(g)
             % Joint Space Measurement Data
-            data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,k+1) = Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(k)))(:,1);
+            % if k > 1
+            %     data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,k+1) = NaN(length(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(1)))(:,1)),1);
+            % end
+            for p = 1:length(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(k)))(:,1))
+                data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(p,k+1) = Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(k)))(p,1);
+            end           
         end
     end
 end
@@ -172,20 +182,18 @@ for n = 1:length(subjects)
         int_temp = cell(MeanCP,length(data.(string(subjects(n))).Frame(:,1)));          
         
         if length(IntData.(string(subjects(n))).Frame(:,1)) == 1    
-            if CItoDist == 1
-                for inter_v = 1:length(data.(string(subjects(n))).CP.F_1)
-                    int_temp(data.(string(subjects(n))).CP.F_1(inter_v,1),:) = {data.(string(subjects(n))).CP.F_1(inter_v,CItoDist+1)};
-                end        
-                % % CI.(string(subjects(n))) = int_temp;
-                DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;
-            end
-            % % if CItoDist == 2
-            % % for inter_v = 1:length(data.(string(subjects(n))).CP.F_1)
-            % %     int_temp(data.(string(subjects(n))).CP.F_1(inter_v,1),:) = {data.(string(subjects(n))).CP.F_1(inter_v,3)};
-            % % end        
-                % % Dist.(string(subjects(n))) = int_temp;
-            % % end
+            for inter_v = 1:length(data.(string(subjects(n))).CP.F_1)
+                int_temp(data.(string(subjects(n))).CP.F_1(inter_v,1),:) = {data.(string(subjects(n))).CP.F_1(inter_v,CItoDist+1)};
+            end        
+            DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;
         else
+            % Split into clusters and interpolate across the entire
+            % activity. The issue being if there are particles that have
+            % data during some frames and not in others it was unable to
+            % interpolate. So each section needed to be interpolated
+            % independently and plugged back in to its correct percentages
+            % of stance. A lot of different variables are used for counting
+            % and storage.
             for h = 1:length(cp(:,1))
                 ch = 0;
                 bbb = 1;
@@ -241,18 +249,12 @@ for n = 1:length(subjects)
                 end
             clear c_temp c_start
             end
-            DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;
-            % % if CItoDist == 1
-            % %     CI.(string(subjects(n))) = int_temp;
-            % % end
-            % % if CItoDist == 2
-            % %     Dist.(string(subjects(n))) = int_temp;
-            % % end    
+            DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;    
             clear int_temp
         end    
     end
 end
-clearvars -except pool subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names
+clearvars -except pool subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g
 
 %%
 
@@ -278,15 +280,18 @@ for study_pop = 1:length(g)
                 end
                 DataOut_Mean.(string(gg(CItoDist))).(string(g(study_pop)))(n,m) = 0;
                 
-                if isempty(temp) == 0 && length(temp) >= 2
-                    y = find(temp == 0);
-                    if isempty(y) == 0
-                        temp(y) = [];
-                    end
-                    if length(temp) >= floor(length(subjects)) % How many articulating CP in order to be included
+                if isempty(temp) == 0 
+                    if length(temp) >= 2
+                        y = find(temp == 0);
+                        if isempty(y) == 0
+                            temp(y) = [];
+                        end
+                        % temp(find(isnan(temp))) = [];
                         DataOut_Mean.(string(gg(CItoDist))).(string(g(study_pop)))(n,m) = mean(temp);
-                        DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {temp};
-                    end    
+                        if length(temp) >= floor(length(subjects)) % How many articulating CP in order to be included
+                            DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {temp};
+                        end
+                    end
                 end
             end
         end
@@ -323,7 +328,7 @@ for study_pop = 1:length(g)
 end
 
 %% Calculate Overall Mean and STD From All Data
-fprintf('Calculating Overall Mean and STD\n')
+fprintf('Consolidating Data\n')
 g = fieldnames(subj_group);
 gg = fieldnames(DataOut);
 for study_pop = 1:length(g)
@@ -362,7 +367,11 @@ if length(Data.(string(g(g_count))).CoverageArea.F_1) == 1
         surf_area{1,g_count} = string(g(g_count));
         surf_area{2,g_count} = string(bone_names(1));
         for frame_count = 1:length(gg)
-            surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+            if iscell(Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
+                surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+            else 
+                surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
+            end
         end
     end
 elseif length(Data.(string(g(g_count))).CoverageArea.F_1) == 2
@@ -373,8 +382,13 @@ elseif length(Data.(string(g(g_count))).CoverageArea.F_1) == 2
         surf_area{2,g_spacer(g_count)} = string(bone_names(1));
         surf_area{2,g_spacer(g_count)+1} = string(bone_names(2));
         for frame_count = 1:length(gg)
-            surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
-            surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
+            if iscell(Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
+            else
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,2);
+            end
         end
     end
 end
@@ -386,6 +400,8 @@ MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd)));
 if isempty(MF) == 1
     mkdir(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd));
 end
+
+addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd))
 
 perc_temp           = IntData.(string(subjects(1))).Frame(:,1);
 
@@ -409,7 +425,7 @@ for n = 1:length(g)
     temp_name = strcat(temp_name,temp_n);
 end
 
-writecell(surf_area,sprintf('%s\\MAT_Files\\JMA_02_Outputs\\%s',pwd,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
+writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
 
 save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
 fprintf('Complete!\n')

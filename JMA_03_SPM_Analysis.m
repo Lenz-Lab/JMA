@@ -36,9 +36,10 @@ select_perspective = str2double(inp_ui{5});
 alpha_val = str2double(inp_ui{6});
 
 %% Load Data
-uiwait(msgbox('Please select the .mat file with the normalized data to be processed'));
+uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
 
-load(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\%s',pwd,uigetfile(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\*.mat',pwd))))
+addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd))
+load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',pwd))))
 % Names of groups to process
 groups = fieldnames(subj_group);
 
@@ -48,7 +49,7 @@ groups = fieldnames(subj_group);
 data_1 = string(groups(comparison(1)));
 data_2 = string(groups(comparison(2)));
 
-inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please which data to analyze','ListSize',[500 250]);
+inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please pick which data to analyze','ListSize',[500 250]);
 
 %% Load .stl Bone File for Plots
 S = dir(fullfile(sprintf('%s\\Mean_Models',pwd),'*.stl'));     
@@ -69,7 +70,7 @@ for c = 1:length(S)
             group_check = 1;
         end
         if bone_check == 1 && group_check == 1
-            MeanShape = stlread(S(c).name);
+            MeanShape = stlread(sprintf('%s\\Mean_Models\\%s',pwd,S(c).name));
         end
     end
 end
@@ -93,7 +94,7 @@ for c = 1:length(S)
             group_check = 1;
         end
         if bone_check == 1 && group_check == 1
-            MeanCP = load(S(c).name);
+            MeanCP = load(sprintf('%s\\Mean_Models\\%s',pwd,S(c).name));
         end
     end
 end
@@ -130,80 +131,71 @@ end
 % This section of code separates the data and conducts a Statistical
 % Parametric Mapping analysis resulting in regions of significance at each
 % particle.
+
 g = fieldnames(DataOut_SPM);
 gg = fieldnames(DataOut_SPM.(string(g(1))));
-for g_count = 1:length(g)
+for g_count = 1:inpdata
     reg_sig.(string(g(g_count))) = {};
     for n = 1:min([length(DataOut_SPM.(string(g(g_count))).(string(data_1))) length(DataOut_SPM.(string(g(g_count))).(string(data_2)))])
+        clear section1 section2 pperc_stance
         % Separate data
         data1 = [];
         data2 = [];
-        mm = 1;
+        % mm = 1;
         for m = 1:max_frames
             if isequal(SPM_check_list.(string(data_1)){n,m},1) && isequal(SPM_check_list.(string(data_2)){n,m},1) && isempty(DataOut_SPM.(string(g(g_count))).(string(data_1)){n,m}) == 0
-                data1(:,mm) = cell2mat(DataOut_SPM.(string(g(g_count))).(string(data_1)){n,m});
-                data2(:,mm) = cell2mat(DataOut_SPM.(string(g(g_count))).(string(data_2)){n,m});
-                pperc_stance(mm) = perc_stance(m);
-                mm = mm + 1;
+                data1(:,m) = cell2mat(DataOut_SPM.(string(g(g_count))).(string(data_1)){n,m});
+                data2(:,m) = cell2mat(DataOut_SPM.(string(g(g_count))).(string(data_2)){n,m});
+                % pperc_stance(m) = perc_stance(m);
+                % mm = mm + 1;
             end
         end
-     
+
         % Find regions of statistical significance for each particle.
         % Note that the figures are suppressed!
+        k = 1;
         if isempty(data1) == 0
-            if length(data1(1,:)) > 1  
-                sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),1,string(g(g_count)),[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance,['r','g'],alpha_val,0);
-                if isempty(sig_stance) == 0
-                    reg_sig.(string(g(g_count)))(n,:) = {sig_stance};
-                    clear data1 data2
-                end
-            end
-        end
-    end
-end
+            if length(data1(1,:)) > 1
 
-%%
-for g_count = 1:length(g)
-    Reg_Sig.(string(g(g_count))) = cell(length(reg_sig.(string(g(g_count)))),1);
-    for n = 1:length(reg_sig.(string(g(g_count))))
-        temp = cell2mat(Reg_Sig.(string(g(g_count)))(n));
-        if isempty(temp) == 0
-            start_end = [];
-            for x = 1:length(temp(:,1))
-                m1 = find(perc_stance == temp(x,1));
-                m2 = find(perc_stance == temp(x,2));
-                
-                k = 1;
-                t = [];
-                p_check = perc_stance(m1:m2,:);
-                for m = m1:m2
-                    t(k,:) = [DataOut_Mean.(string(g(g_count))).(string(data_1))(n,m), DataOut_Mean.(string(g(g_count))).(string(data_2))(n,m)];
-                    if t(k,1) > Distance_Upper || t(k,2) > Distance_Upper
-                        p_check(k,:) = 0;
+
+                temp1 = find(data1(1,:) == 0);
+                temp2 = find(data1(2,:) == 0);
+                h = 1;
+                clear chunk1
+                if  isequal(temp1,temp2) && isempty(temp1) == 0 && isempty(temp2) == 0
+                    ne0 = find(data1(1,:)~=0);                      % Nonzero Elements
+                    ix0 = unique([ne0(1) ne0(diff([0 ne0])>1)]);    % Segment Start Indices
+                    ix1 = ne0([find(diff(ne0)>1) length(ne0)]);     % Segment End Indices
+                    for k1 = 1:length(ix0)
+                        section1{k1}        = data1(:,ix0(k1):ix1(k1));    % (Included the column)
+                        section2{k1}        = data2(:,ix0(k1):ix1(k1));    
+                        pperc_stance{k1}    = perc_stance(ix0(k1):ix1(k1),:); 
                     end
-                    k = k + 1;
-                end
-                
-                k = 1;
-                p_fill = {};
-                for p = 1:length(p_check)
-                    if p_check(p,:) > 0
-                        p_fill{k,end+1} = p_check(p,:);
-                    end
-                    if p > 1 && p_check(p,:) == 0 && p_check(p-1,:) > 0
-                        k = k + 1;
-                    end    
-                end
-                
-                if isempty(p_fill) == 0
-                    for p = 1:length(p_fill(:,1))
-                        temp_se = cell2mat(p_fill(p,:));
-                        start_end(end+1,:) = [temp_se(1) temp_se(end)];
-                    end
+                    % ne0 = find(data2(1,:)~=0);                      % Nonzero Elements
+                    % ix0 = unique([ne0(1) ne0(diff([0 ne0])>1)]);    % Segment Start Indices
+                    % ix1 = ne0([find(diff(ne0)>1) length(ne0)]);     % Segment End Indices
+                    % for k1 = 1:length(ix0)
+                    %     section2{k1} = data2(:,ix0(k1):ix1(k1));    % (Included the column)
+                    % end
+                    reg_sig.(string(g(g_count)))(n,:) = {[]};
+                    ss = 1;
+                    for s = 1:length(section1)
+                        if length(section1{s}(1,:)) > 1
+                            sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),1,string(g(g_count)),[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
+                            if isempty(sig_stance) == 0
+                                reg_sig.(string(g(g_count)))(n,:) = {[cell2mat(reg_sig.(string(g(g_count)))(n,:)); sig_stance]};
+                            end
+                            ss = ss + 1;
+                        end
+                    end                   
+                else
+                    sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),1,string(g(g_count)),[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
+                    if isempty(sig_stance) == 0
+                        reg_sig.(string(g(g_count)))(n,:) = {sig_stance};
+                        clear data1 data2
+                    end                    
                 end
             end
-            
-            Reg_Sig.(string(g(g_count)))(n) = {start_end};
         end
     end
 end
@@ -219,8 +211,9 @@ for plot_data = inpdata
     for n = 1:max_frames
         %% Create directory to save .tif images
         tif_folder = sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s\\',pwd,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2));
-        disp(tif_folder)
+        
         if n == 1
+            disp(tif_folder)
             fprintf('%s: %s vs %s\n',string(data_1),string(data_1),string(data_2))
             % Create directory to save results
             mkdir(tif_folder);
@@ -247,14 +240,18 @@ for plot_data = inpdata
             end
         end
         % 
-        reg_sig = Reg_Sig.(string(g(plot_data)));
+        if isfield(reg_sig,string(g(plot_data))) == 1
+            reg_sigg = reg_sig.(string(g(plot_data)));
+        else
+            reg_sigg = [];
+        end
 
         %%
             SPM_index = [];
             tt = [];
             k = 1;
-        for z = 1:length(reg_sig)
-            t = cell2mat(reg_sig(z));
+        for z = 1:length(reg_sigg)
+            t = cell2mat(reg_sigg(z));
             if isempty(t) == 0
                 for x = 1:length(t(:,1))
                     if t(x,1) <= perc_stance(n) && t(x,2) >= perc_stance(n)

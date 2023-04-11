@@ -16,7 +16,9 @@ clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 addpath(sprintf('%s\\Mean_Models',pwd))
 
-inp_ui = inputdlg({'Enter distance upper limit:','Enter distance lower limit:','View Perspective(1)','View Perspective(2)','Select viewing perspective? (Yes = 1, No = 0)'},'User Inputs',[1 100],{'6','0','20','45','0'});
+inp_ui = inputdlg({'Enter distance upper limit:','Enter distance lower limit:',...
+    'View Perspective(1)','View Perspective(2)','Select viewing perspective? (Yes = 1, No = 0)',...
+    'What is the minimum percentage of patients that must be included? (%) (Only for group results)'},'User Inputs',[1 100],{'6','0','20','45','0','100'});
 
 Distance_Upper = str2double(inp_ui{1}); % Upper limit for distance results
 % Any values above the upper limit will be removed from the results and no
@@ -32,9 +34,12 @@ view_perspective = [str2double(inp_ui{3}) str2double(inp_ui{4})]; % Sets the ang
 % Creates a figure to select the viewing perspective
 select_perspective = str2double(inp_ui{5});
 
+% percentage of partipants to be included in the analysis
+perc_part = str2double(inp_ui{6});
+
 %% Load Data
-uiwait(msgbox('Please select the .mat file with the normalized data to be processed'));
-load(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\%s',pwd,uigetfile(sprintf('%s\\MAT_Files\\JMA_02_Outputs\\*.mat',pwd))))
+uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
+load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',pwd))))
 
 %%
 % Names of groups to process
@@ -67,7 +72,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanShape = stlread(S(c).name);
+                MeanShape = stlread(sprintf('%ss\\Mean_Models\\%s',pwd,S(c).name));
             end
         end
     end
@@ -90,7 +95,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanCP = load(S(c).name);
+                MeanCP = load(sprintf('%ss\\Mean_Models\\%s',pwd,S(c).name));
             end
         end
     end    
@@ -203,8 +208,9 @@ for plot_data = inpdata
         %% Create directory to save .tif images
         tif_folder = sprintf('%s\\Results\\Results_Particles_%s_%s_%s\\%s_%s\\',pwd,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1));
         if n == 1
-            fprintf('%s: %s\n',string(groups),string(data_1))
             disp(tif_folder)
+            fprintf('%s: %s\n',string(groups),string(data_1))
+            
             % Create directory to save results
             mkdir(tif_folder);
         end
@@ -225,17 +231,30 @@ for plot_data = inpdata
         k = 1;
         if grp_prt == 1
             for m = 1:length(DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(:,1))
-                if isempty(DataOut_Mean.(string(plot_data_name(plot_data))).(string(groups))(m,n)) == 0
-                    if DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) > 0 && DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) <= Distance_Upper
-                        temp(k,:) = [m DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n)];
-                        k = k + 1;
-                    end
+
+            data_cons1 = [];
+            datd_cons1 = [];
+            ss = 1;
+            for s = 1:length(subj_group.(data_1).SubjectList)
+                if isempty(DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1).SubjectList(s))){m,n}) == 0
+                    data_cons1(ss) = DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1).SubjectList(s))){m,n};
+                    datd_cons1(ss) = DataOut.Distance.(string(subj_group.(data_1).SubjectList(s))){m,n};
+                    ss = ss + 1;
                 end
+            end
+
+            if isempty(datd_cons1) == 0
+                if mean(datd_cons1) <= Distance_Upper && mean(datd_cons1) >= Distance_Lower ...
+                        && length(data_cons1) >= floor(length(subj_group.(data_1).SubjectList)*(perc_part(1)/100))
+                    temp(k,:) = [m mean(data_cons1)];
+                    k = k + 1;
+                end
+            end
             end
         elseif grp_prt == 2
             for m = 1:length(DataOut.(string(plot_data_name(plot_data))).(string(data_1))(:,1))
                 if isempty(DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n}) == 0
-                    if DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n} > 0 && DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n} <= Distance_Upper
+                    if DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n} <= Distance_Upper && DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n} >= Distance_Lower
                         temp(k,:) = [m DataOut.(string(plot_data_name(plot_data))).(string(data_1)){m,n}];
                         k = k + 1;
                     end

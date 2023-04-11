@@ -201,20 +201,20 @@ for n = 1:str2double(study_num)
                     temp_read = readmatrix(E(e_count).name);
                     if isequal(size(temp_read),[1 4]) == 1
                         Data.(string(pulled_files(m))).Event = temp_read;
-                    elseif isequal(size(temp_read),[1 4]) == 0
-                        %% Load Other Data (FEA, DEA, Cortical Thickness, etc.)
-                        % The spreadsheet needs to have number of rows equal to
-                        % the number of frames and column indices are bone mesh
-                        % points or vertices.
-                        new_data_name = E(e_count).name;
-                        new_data_name = strrep(strrep(new_data_name,'.csv',''),'.xslx','');
-                        rem = strfind(lower(new_data_name),string(lower(pulled_files(m))));
-                        new_data_name(rem:(strlength(string(lower(subjects1(m))))+rem-1)) = '';
-                        new_data_name = lower(strrep(strrep(new_data_name,'_',''),' ',''));
-                        for frame_count = 1:length(temp_read(1,:))
-                            Data.(string(pulled_files(m))).ImportData.(new_data_name).(sprintf('F_%d',frame_count)) = temp_read(:,frame_count);
-                        end
-                        data_count = data_count + 1;
+                    % elseif isequal(size(temp_read),[1 4]) == 0
+                    %     %% Load Other Data (FEA, DEA, Cortical Thickness, etc.)
+                    %     % The spreadsheet needs to have number of rows equal to
+                    %     % the number of frames and column indices are bone mesh
+                    %     % points or vertices.
+                    %     new_data_name = E(e_count).name;
+                    %     new_data_name = strrep(strrep(new_data_name,'.csv',''),'.xslx','');
+                    %     rem = strfind(lower(new_data_name),string(lower(pulled_files(m))));
+                    %     new_data_name(rem:(strlength(string(lower(subjects1(m))))+rem-1)) = '';
+                    %     new_data_name = lower(strrep(strrep(new_data_name,'_',''),' ',''));
+                    %     for frame_count = 1:length(temp_read(1,:))
+                    %         Data.(string(pulled_files(m))).ImportData.(new_data_name).(sprintf('F_%d',frame_count)) = temp_read(:,frame_count);
+                    %     end
+                    %     data_count = data_count + 1;
                     end
                 elseif isempty(E) == 1
                     Data.(string(pulled_files(m))).Event = [1 1 1 1];
@@ -770,14 +770,14 @@ for group_count = 1:length(groups)
             Data.(string(subjects(subj_count))).MeasureData.(sprintf('F_%d',frame_count)).Data.Distance     = i_surf(:,4);
             Data.(string(subjects(subj_count))).MeasureData.(sprintf('F_%d',frame_count)).Data.Congruence   = i_surf(:,5);
             
-            if isfield(Data.(string(subjects(subj_count))),'ImportData') == 1
-                gg = fieldnames(Data.(string(subjects(subj_count))).ImportData);
-                for g_count = 1:length(gg)
-                    for i_count = 1:length(i_surf(:,1))
-                        Data.(string(subjects(subj_count))).MeasureData.(sprintf('F_%d',frame_count)).Data.(string(gg(g_count)))(i_count,1) = Data.(string(subjects(subj_count))).ImportData.(string(gg(g_count))).(sprintf('F_%d',frame_count))(i_surf(i_count,2),1);
-                    end
-                end
-            end
+            % if isfield(Data.(string(subjects(subj_count))),'ImportData') == 1
+            %     gg = fieldnames(Data.(string(subjects(subj_count))).ImportData);
+            %     for g_count = 1:length(gg)
+            %         for i_count = 1:length(i_surf(:,1))
+            %             Data.(string(subjects(subj_count))).MeasureData.(sprintf('F_%d',frame_count)).Data.(string(gg(g_count)))(i_count,1) = Data.(string(subjects(subj_count))).ImportData.(string(gg(g_count))).(sprintf('F_%d',frame_count))(i_surf(i_count,2),1);
+            %         end
+            %     end
+            % end
     
             %% Clear Variables and Save Every X Number of Frames
             clear Temp_STL

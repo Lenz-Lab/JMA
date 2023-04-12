@@ -227,7 +227,8 @@ for n = 1:str2double(study_num)
         %% Load the Correspondence Particles (CP) from ShapeWorks
         C = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.particles'));    
         for c = 1:length(C)
-            temp = split(C(c).name,'_');
+            temp = erase(C(c).name,'.particles');
+            temp = split(temp,'_');
             for d = 1:length(temp)
                 temp_check = strfind(lower(string(bone_names(1))),lower(string(temp(d))));
                 if  temp_check == 1
@@ -279,8 +280,15 @@ for subj_count = 1:length(g)
                 P = (R*p + repmat(T,1,length(p)))';          
 
             %% Identify Nodes and CP
+
             % Find the .stl nodes and their respective correspondence
             % particles and save to Data structure
+            % figure()
+            % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
+            % hold on
+            % plot3(P(:,1),P(:,2),P(:,3),'.k')
+            % axis equal
+                        
             tol = 2;
             i_pair = zeros(length(CP(:,1)),2);
             for r = 1:length(CP(:,1))

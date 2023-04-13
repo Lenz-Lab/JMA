@@ -356,7 +356,7 @@ for group_count = 1:length(groups)
         end    
         
         %%
-        for frame_count = frame_start%:length(kine_data_length(:,1))
+        for frame_count = frame_start:length(kine_data_length(:,1))
             tic
             %%
             fprintf('      %d\n',frame_count)

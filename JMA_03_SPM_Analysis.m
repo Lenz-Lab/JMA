@@ -14,7 +14,6 @@
 %% Clean Slate
 clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
-addpath(sprintf('%s\\Mean_Models',pwd))
 
 inp_ui = inputdlg({'Enter distance upper limit:','Enter distance lower limit:','View Perspective(1)','View Perspective(2)','Select viewing perspective? (Yes = 1, No = 0)','Alpha Value'},'User Inputs',[1 100],{'6','0','20','45','0','0.05'});
 
@@ -36,10 +35,15 @@ select_perspective = str2double(inp_ui{5});
 alpha_val = str2double(inp_ui{6});
 
 %% Load Data
+uiwait(msgbox('Please select the directory where the data is located'))
+data_dir = string(uigetdir());
+
+addpath(sprintf('%s\\Mean_Models',data_dir))
+
 uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
 
-addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd))
-load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',pwd))))
+addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir))
+load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',data_dir))))
 % Names of groups to process
 groups = fieldnames(subj_group);
 
@@ -52,7 +56,7 @@ data_2 = string(groups(comparison(2)));
 inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please pick which data to analyze','ListSize',[500 250]);
 
 %% Load .stl Bone File for Plots
-S = dir(fullfile(sprintf('%s\\Mean_Models',pwd),'*.stl'));     
+S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
 for c = 1:length(S)
     temp = strsplit(S(c).name,'.');
     temp = strrep(temp(1),' ','_');
@@ -70,13 +74,13 @@ for c = 1:length(S)
             group_check = 1;
         end
         if bone_check == 1 && group_check == 1
-            MeanShape = stlread(sprintf('%s\\Mean_Models\\%s',pwd,S(c).name));
+            MeanShape = stlread(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
         end
     end
 end
 
 %% Load .particles File for Plots
-S = dir(fullfile(sprintf('%s\\Mean_Models',pwd),'*.particles'));     
+S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.particles'));     
 for c = 1:length(S)
     temp = strsplit(S(c).name,'.');
     temp = strrep(temp(1),' ','_');
@@ -94,7 +98,7 @@ for c = 1:length(S)
             group_check = 1;
         end
         if bone_check == 1 && group_check == 1
-            MeanCP = load(sprintf('%s\\Mean_Models\\%s',pwd,S(c).name));
+            MeanCP = load(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
         end
     end
 end
@@ -210,7 +214,7 @@ for plot_data = inpdata
     N_length = [];
     for n = 1:max_frames
         %% Create directory to save .tif images
-        tif_folder = sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s\\',pwd,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2));
+        tif_folder = sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2));
         
         if n == 1
             disp(tif_folder)
@@ -277,7 +281,7 @@ for plot_data = inpdata
     end
     %%
     fprintf('Creating video...\n')
-    video = VideoWriter(sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s.mp4',pwd,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2))); % Create the video object.
+    video = VideoWriter(sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s.mp4',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2))); % Create the video object.
     video.FrameRate = 7;
     open(video); % Open the file for writing
     for N = N_length

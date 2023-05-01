@@ -45,6 +45,9 @@ coverage_area_check = str2double(inp_ui{6});
 % Save the coverage area .stl files and pick which frames
 save_stl = str2double(inp_ui{7});
 
+uiwait(msgbox('Please select the directory where the data is located'))
+data_dir = string(uigetdir());
+
 % Folder Architecture:
 % Main Directory -> (folder containing each of the group folders)
 %     Folders:
@@ -79,9 +82,9 @@ save_stl = str2double(inp_ui{7});
 % .github repository. 
 
 %% Clean Slate
-clc; close all; clearvars -except bone_names study_num overwrite_data save_interval coverage_area_check save_stl_frame save_stl
+clc; close all; clearvars -except bone_names study_num overwrite_data save_interval coverage_area_check save_stl_frame save_stl data_dir
 addpath(sprintf('%s\\Scripts',pwd))
-addpath(sprintf('%s\\Mean_Models',pwd)) 
+addpath(sprintf('%s\\Mean_Models',data_dir)) 
 
 subjects = [];
 
@@ -89,7 +92,7 @@ subjects = [];
 fldr_name = cell(str2double(study_num),1);
 for n = 1:str2double(study_num)
     uiwait(msgbox(sprintf('Please select the %d study group',n)))
-    fldr_name{n} = uigetdir;
+    fldr_name{n} = uigetdir(data_dir);
     addpath(fldr_name{n})
 end
 
@@ -100,7 +103,7 @@ clc
 %% Loading Data
 fprintf('Loading Data:\n')
 for n = 1:str2double(study_num)
-    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
+    D = dir(fullfile(sprintf('%s\\%s\\',data_dir,fldr_name{n})));
     
     pulled_files = [];
     m = 1;
@@ -116,10 +119,10 @@ for n = 1:str2double(study_num)
     for m = 1:length(pulled_files)
         %%
         fprintf('   %s\n',string(pulled_files(m)))
-        addpath(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))))
+        addpath(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))))
         
         %% Load the Bone.stl Files
-        S = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.stl'));
+        S = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.stl'));
         for b = 1:length(bone_names)     
             for c = 1:length(S)
                 temp = strsplit(S(c).name,'.');
@@ -153,7 +156,7 @@ for n = 1:str2double(study_num)
         end
         
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.txt'));
+        K = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.txt'));
         if isempty(K) == 0
             for b = 1:length(bone_names)     
                 for c = 1:length(K)
@@ -185,47 +188,37 @@ for n = 1:str2double(study_num)
         % structure is [(first tracked frame) (heelstrike) (toe-off) (last tracked frame)]
         for k = 1:2
             if k == 1
-                E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.xlsx'));
+                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.xlsx'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.csv'));
+                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.csv'));
                 end
             elseif k == 2
-                E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.csv'));
+                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.csv'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.xlsx'));
+                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.xlsx'));
                 end        
             end
-            for e_count = 1:length(E)
-                clear temp_read
-                if isempty(E) == 0
+
+            if isempty(E) == 1
+                Data.(string(pulled_files(m))).Event = [1 1 1 1];
+            elseif isempty(E) == 0
+                for e_count = 1:length(E)
+                    clear temp_read
+                    
                     temp_read = readmatrix(E(e_count).name);
                     if isequal(size(temp_read),[1 4]) == 1
                         Data.(string(pulled_files(m))).Event = temp_read;
-                    % elseif isequal(size(temp_read),[1 4]) == 0
-                    %     %% Load Other Data (FEA, DEA, Cortical Thickness, etc.)
-                    %     % The spreadsheet needs to have number of rows equal to
-                    %     % the number of frames and column indices are bone mesh
-                    %     % points or vertices.
-                    %     new_data_name = E(e_count).name;
-                    %     new_data_name = strrep(strrep(new_data_name,'.csv',''),'.xslx','');
-                    %     rem = strfind(lower(new_data_name),string(lower(pulled_files(m))));
-                    %     new_data_name(rem:(strlength(string(lower(subjects1(m))))+rem-1)) = '';
-                    %     new_data_name = lower(strrep(strrep(new_data_name,'_',''),' ',''));
-                    %     for frame_count = 1:length(temp_read(1,:))
-                    %         Data.(string(pulled_files(m))).ImportData.(new_data_name).(sprintf('F_%d',frame_count)) = temp_read(:,frame_count);
-                    %     end
-                    %     data_count = data_count + 1;
                     end
-                elseif isempty(E) == 1
-                    Data.(string(pulled_files(m))).Event = [1 1 1 1];
-                elseif isempty(E) == 1 && length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1)) > 1
-                    Data.(string(pulled_files(m))).Event = [1 1 length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1)) length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1))];
                 end
+            end
+            
+            if isempty(E) == 1 && length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1)) > 1
+                Data.(string(pulled_files(m))).Event = [1 1 length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1)) length(Data.(string(pulled_files(m))).(string(bone_names(b))).Kinematics(:,1))];
             end
         end
 
         %% Load the Correspondence Particles (CP) from ShapeWorks
-        C = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.particles'));    
+        C = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.particles'));    
         for c = 1:length(C)
             temp = erase(C(c).name,'.particles');
             temp = split(temp,'_');
@@ -248,7 +241,11 @@ fprintf('Local Particles -> Bone Indices\n')
 g = fieldnames(Data);
 for subj_count = 1:length(g)
     for bone_count = 1:length(bone_names)
+        %%
         if isfield(Data.(string(subjects(subj_count))).(string(bone_names(bone_count))),'CP') == 1
+            flip_it = 1;
+            flip_dir = 1;
+            while flip_it == 1
             % This section is important! If the bones used to create the
             % shape model were aligned OUTSIDE of ShapeWorks than this
             % section is necessary. If they were aligned and groomed
@@ -271,13 +268,39 @@ for subj_count = 1:length(g)
                     end   
                 elseif isfield(Data.(string(subjects(subj_count))),'Side') == 0
                         p = [p(:,1) p(:,2) p(:,3)]';
-                end           
+                end
 
+                if flip_dir == 1
                 % calculate the rotations and translation matrices
     %             Jakob Wilm (2022). Iterative Closest Point (https://www.mathworks.com/matlabcentral/fileexchange/27804-iterative-closest-point), MATLAB Central File Exchange.
                 [R,T] = icp(q,p,1000,'Matching','kDtree');
 
-                P = (R*p + repmat(T,1,length(p)))';          
+                P = (R*p + repmat(T,1,length(p)))';                     
+                elseif flip_dir == 2
+                    Rt = [1 0 0;0 cosd(180) -sind(180);0 sind(180) cosd(180)];
+                    p =  Rt*P';
+                    
+                    [R,T] = icp(q,p,1000,'Matching','kDtree');
+                    
+                    P = (R*p + repmat(T,1,length(p)))';                   
+                elseif flip_dir == 3
+                   Rt = [cosd(180) 0 sind(180); 0 1 0; -sind(180) 0 cosd(180)];
+                   p =  Rt*P';
+                    [R,T] = icp(q,p,1000,'Matching','kDtree');
+                    
+                    P = (R*p + repmat(T,1,length(p)))';                   
+                elseif flip_dir == 4
+                   Rt = [cosd(180) -sind(180) 0; sind(180) cosd(180) 0; 0 0 1];
+                   p =  Rt*P';
+                    [R,T] = icp(q,p,1000,'Matching','kDtree');
+                    
+                    P = (R*p + repmat(T,1,length(p)))';                   
+                elseif flip_dir > 4
+                    warning("Your input bone models may be incorrect, unable to pair correspondence particles with bone nodes");
+                    break
+                end
+
+         
 
             %% Identify Nodes and CP
 
@@ -290,16 +313,23 @@ for subj_count = 1:length(g)
             % axis equal
                         
             tol = 2;
-            i_pair = zeros(length(CP(:,1)),2);
+            i_pair = [];%zeros(length(CP(:,1)),2);
             for r = 1:length(CP(:,1))
                 ROI = find(P(:,1) >= CP(r,1)-tol & P(:,1) <= CP(r,1)+tol & P(:,2) >= CP(r,2)-tol & P(:,2) <= CP(r,2)+tol & P(:,3) >= CP(r,3)-tol & P(:,3) <= CP(r,3)+tol);
 
                 found_dist = pdist2(single(CP(r,:)),single(P(ROI,:)));
                 min_dist = (ROI(find(found_dist == min(found_dist))));
-                i_pair(r,:) = [r min_dist(1)];
+                if isempty(min_dist) == 0
+                    i_pair(r,:) = [r min_dist(1)];
+                    flip_it = 0;
+                elseif isempty(min_dist) == 1
+                    flip_dir = flip_dir + 1;
+                    break
+                end
                 clear found_dist min_dist ROI
             end
             Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).CP_Bone = i_pair;
+        end
         end
     end
 end
@@ -318,7 +348,7 @@ for group_count = 1:length(groups)
         end
         
         clear temp
-        M = dir(fullfile(sprintf('%s\\%s\\%s',pwd,string(groups(group_count)),string(subjects(subj_count))),'*mat'));
+        M = dir(fullfile(sprintf('%s\\%s\\%s\\%s',data_dir,string(groups(group_count)),string(subjects(subj_count))),'*mat'));
           
         if isempty(M) == 0 && overwrite_data == 0
             for c = 1:length(M)
@@ -326,7 +356,7 @@ for group_count = 1:length(groups)
                 temp_file = strrep(temp_file(1),' ','_');
                 temp_file = split(string(temp_file(1)),'_');
                 if isequal(temp_file(2),string(bone_names(1))) && isequal(temp_file(3),string(bone_names(2)))
-                    temp = load(K(c).name);
+                    temp = load(M(c).name);
                     g = fieldnames(temp.Data);
                     Data.(string(g)) = temp.Data.(string(g));
                 end
@@ -336,24 +366,7 @@ for group_count = 1:length(groups)
                frame_start = length(fieldnames(temp.Data.(string(subjects(subj_count))).MeasureData)) + 1;
                Data.(string(subjects(subj_count))) = temp.Data.(string(subjects(subj_count)));
             end
-        end 
-    
-        if isempty(M) == 0 && overwrite_data == 1
-            for c = 1:length(M)
-                temp_file = strsplit(M(c).name,'.');
-                temp_file = strrep(temp_file(1),' ','_');
-                temp_file = split(string(temp_file(1)),'_');
-                if isequal(temp_file(2),string(bone_names(1))) && isequal(temp_file(3),string(bone_names(2)))
-                    temp = load(K(c).name);
-                    g = fieldnames(temp.Data);
-                    Data.(string(g)) = temp.Data.(string(g));
-                end
-            end 
-           frame_start = 1;
-           if exist("temp") == 1
-                Data.(string(subjects(subj_count))) = temp.Data.(string(subjects(subj_count)));
-           end
-        end    
+        end   
         
         %%
         for frame_count = frame_start:length(kine_data_length(:,1))
@@ -390,7 +403,36 @@ for group_count = 1:length(groups)
                 end
                 
                 clear R bone_data kine_data
-            end
+            end        
+
+%% Troubleshoot
+% If you want to check and see if the transformations are moving the bones
+% correctly uncomment this section and run. Be aware that MATLAB 3D viewing
+% has its limitations and they may be at a weird viewing perspective.
+
+% subj_trouble = string(g(1));
+% TR.vertices =  Data.(subj_trouble).(string(bone_names(1))).(string(bone_names(1))).Points;
+% TR.faces    =  Data.(subj_trouble).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
+% 
+% TR1.vertices =  Data.(subj_trouble).(string(bone_names(2))).(string(bone_names(2))).Points;
+% TR1.faces    =  Data.(subj_trouble).(string(bone_names(2))).(string(bone_names(2))).ConnectivityList;
+% 
+% figure()
+% patch(TR,'FaceColor', [1 1 0], ...
+% 'EdgeColor','none',...        
+% 'FaceLighting','gouraud',...
+% 'AmbientStrength', 0.15);
+% camlight(0,0);
+% material('dull');
+% hold on
+% patch(TR1,'FaceColor', [0 0 1], ...
+% 'EdgeColor','none',...        
+% 'FaceLighting','gouraud',...
+% 'AmbientStrength', 0.15);
+% camlight(0,0);
+% material('dull');
+% hold on
+% axis equal            
             
              %% Find if intersecting and calculate surface area
             for bone_count = 1:length(bone_names)
@@ -525,7 +567,7 @@ for group_count = 1:length(groups)
                         TR.faces    =    temp_STL.(string(bone_names(bone_with_CP))).ConnectivityList(temp_n,:);
         
                         TTTT = triangulation(temp_STL.(string(bone_names(bone_with_CP))).ConnectivityList(temp_n,:),temp_STL.(string(bone_names(bone_with_CP))).Points);
-                        stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%s\\%s',pwd,string(subjects(subj_count)),string(bone_names(bone_with_CP)),string(bone_names(bone_no_CP)),string(bone_names(bone_with_CP)));
+                        stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%s\\%s',data_dir,string(subjects(subj_count)),string(bone_names(bone_with_CP)),string(bone_names(bone_no_CP)),string(bone_names(bone_with_CP)));
     
                         MF = dir(fullfile(stl_save_path));
                         if isempty(MF) == 1
@@ -653,7 +695,7 @@ for group_count = 1:length(groups)
                         TR.faces    =    temp_STL.(string(bone_names(bone_no_CP))).ConnectivityList(temp_n,:);
         
                         TTTT = triangulation(temp_STL.(string(bone_names(bone_no_CP))).ConnectivityList(temp_n,:),temp_STL.(string(bone_names(bone_no_CP))).Points);
-                        stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%s\\%s',pwd,string(subjects(subj_count)),string(bone_names(bone_with_CP)),string(bone_names(bone_no_CP)),string(bone_names(bone_no_CP)));
+                        stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%s\\%s',data_dir,string(subjects(subj_count)),string(bone_names(bone_with_CP)),string(bone_names(bone_no_CP)),string(bone_names(bone_no_CP)));
     
                         MF = dir(fullfile(stl_save_path));
                         if isempty(MF) == 1
@@ -790,19 +832,19 @@ for group_count = 1:length(groups)
             %% Clear Variables and Save Every X Number of Frames
             clear Temp_STL
             Temp_STL = temp_STL;
-            clearvars -except pool fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups
+            clearvars -except pool data_dir fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups
             
-            MF = dir(fullfile(sprintf('%s\\Outputs',pwd)));
+            MF = dir(fullfile(sprintf('%s\\Outputs',data_dir)));
             if isempty(MF) == 1
-                mkdir(sprintf('%s\\Outputs\\',pwd));
-                mkdir(sprintf('%s\\Outputs\\JMA_01_Outputs\\',pwd));
+                mkdir(sprintf('%s\\Outputs\\',data_dir));
+                mkdir(sprintf('%s\\Outputs\\JMA_01_Outputs\\',data_dir));
             end
             
             
             if rem(frame_count,save_interval) == 0
                 fprintf('     saving .mat file backup...\n')
                 SaveData.Data.(string(subjects(subj_count))) = Data.(string(subjects(subj_count)));
-                save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',pwd,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),(string(subjects(subj_count)))),'-struct','SaveData');
+                save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),(string(subjects(subj_count)))),'-struct','SaveData');
                 clear SaveData
             end
             
@@ -815,7 +857,7 @@ for group_count = 1:length(groups)
         
     %% Save Data at the End
     SaveData.Data.(string(subjects(subj_count))) = Data.(string(subjects(subj_count)));
-    save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',pwd,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),string(subjects(subj_count))),'-struct','SaveData');    
+    save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),string(subjects(subj_count))),'-struct','SaveData');    
     clear SaveData
         
     end
@@ -824,7 +866,7 @@ end
 %% Save Data.structure to .mat
 SaveData.Data = Data;
 SaveData.subj_group = subj_group;
-save(sprintf('%s\\Outputs\\JMA_01_Outputs\\Data_All_Test_%s_%s.mat',pwd,string(bone_names(1)),string(bone_names(2))),'-struct','SaveData');
+save(sprintf('%s\\Outputs\\JMA_01_Outputs\\Data_All_Test_%s_%s.mat',data_dir,string(bone_names(1)),string(bone_names(2))),'-struct','SaveData');
 clear SaveData
 
 delete(gcp('nocreate'))

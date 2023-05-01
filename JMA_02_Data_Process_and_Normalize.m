@@ -14,7 +14,6 @@
 %% Clean Slate
 clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
-addpath(sprintf('%s\\Mean_Models',pwd)) 
 
 %% Select Folders
 inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name of opposite bone:','Enter Number of study groups:'},'User Inputs',[1 100],{'Calcaneus','Talus','1'});
@@ -23,18 +22,23 @@ bone_names = {inp_ui{1},inp_ui{2}};
 
 study_num  = inp_ui{3};
 
+uiwait(msgbox('Please select the directory where the data is located'))
+data_dir = string(uigetdir());
+
+addpath(sprintf('%s\\Mean_Models',data_dir)) 
+
 %% Selecting Data
 fldr_name = cell(str2double(study_num),1);
 for n = 1:str2double(study_num)
     uiwait(msgbox(sprintf('Please select the %d study group',n)))
-    fldr_name{n} = uigetdir;
+    fldr_name{n} = uigetdir(data_dir);
     addpath(fldr_name{n})
 end
 
 %% Loading Data
 fprintf('Loading Data:\n')
 for n = 1:str2double(study_num)
-    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
+    D = dir(fullfile(sprintf('%s\\%s\\',data_dir,fldr_name{n})));
     
     pulled_files = [];
     m = 1;
@@ -50,10 +54,10 @@ for n = 1:str2double(study_num)
     for m = 1:length(pulled_files)
         %%
         fprintf('   %s\n',string(pulled_files(m)))
-        addpath(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))))
+        addpath(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))))
         
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.mat'));
+        K = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.mat'));
         if isempty(K) == 0
             %%
             for c = 1:length(K)
@@ -254,7 +258,7 @@ for n = 1:length(subjects)
         end    
     end
 end
-clearvars -except pool subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g
+clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g
 
 %%
 
@@ -396,12 +400,12 @@ end
 %% Save Data to .mat Files
 fprintf('Saving Results\n')
 
-MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd)));
+MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir)));
 if isempty(MF) == 1
-    mkdir(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd));
+    mkdir(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir));
 end
 
-addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',pwd))
+addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir))
 
 perc_temp           = IntData.(string(subjects(1))).Frame(:,1);
 
@@ -425,7 +429,7 @@ for n = 1:length(g)
     temp_name = strcat(temp_name,temp_n);
 end
 
-writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
+writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
 
-save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',pwd,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
+save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
 fprintf('Complete!\n')

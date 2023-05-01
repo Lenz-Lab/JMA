@@ -103,7 +103,7 @@ clc
 %% Loading Data
 fprintf('Loading Data:\n')
 for n = 1:str2double(study_num)
-    D = dir(fullfile(sprintf('%s\\%s\\',data_dir,fldr_name{n})));
+    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
     
     pulled_files = [];
     m = 1;
@@ -119,10 +119,10 @@ for n = 1:str2double(study_num)
     for m = 1:length(pulled_files)
         %%
         fprintf('   %s\n',string(pulled_files(m)))
-        addpath(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))))
+        addpath(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))))
         
         %% Load the Bone.stl Files
-        S = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.stl'));
+        S = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.stl'));
         for b = 1:length(bone_names)     
             for c = 1:length(S)
                 temp = strsplit(S(c).name,'.');
@@ -156,7 +156,7 @@ for n = 1:str2double(study_num)
         end
         
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.txt'));
+        K = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.txt'));
         if isempty(K) == 0
             for b = 1:length(bone_names)     
                 for c = 1:length(K)
@@ -188,14 +188,14 @@ for n = 1:str2double(study_num)
         % structure is [(first tracked frame) (heelstrike) (toe-off) (last tracked frame)]
         for k = 1:2
             if k == 1
-                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.xlsx'));
+                E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.xlsx'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.csv'));
+                    E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.csv'));
                 end
             elseif k == 2
-                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.csv'));
+                E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.csv'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(groups(n)),string(subjects1(m))),'*.xlsx'));
+                    E = dir(fullfile(sprintf('%s\\%s\\',string(groups(n)),string(subjects1(m))),'*.xlsx'));
                 end        
             end
 
@@ -218,7 +218,7 @@ for n = 1:str2double(study_num)
         end
 
         %% Load the Correspondence Particles (CP) from ShapeWorks
-        C = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.particles'));    
+        C = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.particles'));    
         for c = 1:length(C)
             temp = erase(C(c).name,'.particles');
             temp = split(temp,'_');
@@ -299,8 +299,6 @@ for subj_count = 1:length(g)
                     warning("Your input bone models may be incorrect, unable to pair correspondence particles with bone nodes");
                     break
                 end
-
-         
 
             %% Identify Nodes and CP
 

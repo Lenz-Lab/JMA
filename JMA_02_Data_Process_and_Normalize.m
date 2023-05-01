@@ -25,7 +25,8 @@ study_num  = inp_ui{3};
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
 
-addpath(sprintf('%s\\Mean_Models',data_dir)) 
+addpath(sprintf('%s\\Mean_Models',data_dir))
+addpath(data_dir)
 
 %% Selecting Data
 fldr_name = cell(str2double(study_num),1);
@@ -38,7 +39,7 @@ end
 %% Loading Data
 fprintf('Loading Data:\n')
 for n = 1:str2double(study_num)
-    D = dir(fullfile(sprintf('%s\\%s\\',data_dir,fldr_name{n})));
+    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
     
     pulled_files = [];
     m = 1;
@@ -54,10 +55,10 @@ for n = 1:str2double(study_num)
     for m = 1:length(pulled_files)
         %%
         fprintf('   %s\n',string(pulled_files(m)))
-        addpath(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))))
+        addpath(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))))
         
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,string(fldr_name{n}),string(pulled_files(m))),'*.mat'));
+        K = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.mat'));
         if isempty(K) == 0
             %%
             for c = 1:length(K)

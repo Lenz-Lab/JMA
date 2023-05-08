@@ -88,8 +88,11 @@ MeanCP = length(Data.(string(g(1))).(string(bone_names(1))).CP(:,1));
 for subj_count = 1:length(subjects)
     if isfield(Data.(string(subjects(subj_count))),'Event') == 1
         frames = Data.(string(subjects(subj_count))).Event;
-    else
+    elseif isfield(Data.(string(subjects(subj_count))),'Event') == 0
         frames = [1 1 1 1];
+        if length(fieldnames(Data.(string(subjects(subj_count))).MeasureData)) > 1
+            frames = [1 1 length(fieldnames(Data.(string(subjects(subj_count))).MeasureData)) length(fieldnames(Data.(string(subjects(subj_count))).MeasureData))];
+        end
     end
     
     k = 1;

@@ -190,6 +190,10 @@ for n = 1:min(max_cp)
     end
 end
 
+% Define your within-subjects and between-subjects factors
+within_factor = 'Time';
+between_factor = ''; % Leave blank if you don't have a between-subjects factor
+
 %% Run the stats tests
 fs = 1;
 for g_count = inpdata
@@ -240,22 +244,51 @@ for g_count = inpdata
                         clear p_parametric p_nonparametric
                         [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
                         [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
-                        
+
+                        % Define the levels of the repeated measure
+                        levels = groups';
+                        if length(data_all) ~= 27
+                            continue
+                        end
+
+                        data_temp = reshape(data_all,9,3);
+
+                        % Create a table with the data
+                        T = array2table(data_temp, 'VariableNames', {'Time_1', 'Time_2', 'Time_3'});
+
+                        % Add a grouping variable for the repeated measure
+                        T.Time = repmat(levels, size(T,1),1);
+                        T.Time = categorical(T.Time);
+
+                        within_design = table([1 2 3]', 'VariableNames', {'TimePoint'});
+
+                        % Run the repeated measures ANOVA
+                        rm = fitrm(T, 'Time_1-Time_3~1', 'WithinDesign', within_design);
+                        pd_parametric_rm = ranova(rm);
+
                         if comp_flip == 0
                             c = multcompare(pd_parametric,'display','off');
                             p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                
+
+                            c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
+                            c = c{:,:};
+                            p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
+
                             c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
                             p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
                         elseif comp_flip == 1
                             c = multcompare(pd_parametric,'display','off');
                             p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                
+
+                            c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
+                            c = c{:,:};
+                            p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
+
                             c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
                             p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
                         end
-                    
-                        Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+
+                        Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, p_parametric_rm, norm_test(8,3)];% Shapiro-Wilk Normality test
                         if norm_test(8,3) == 0
                             not_normal.(string(g(g_count))) = 0;
                         end
@@ -358,7 +391,6 @@ for plot_data = inpdata
         end
         temp = [];
         temp_display = [];
-        %%
         if isequal(string(plot_data_name(plot_data)),'Distance')
             U = Distance_Upper;
             L = Distance_Lower;
@@ -411,13 +443,17 @@ for plot_data = inpdata
                 if length(a) > 1
                     if a(:,1) > 0 && a(:,2) > 0
                         if not_normal.(string(g(plot_data)))      == 0 && a(:,2) <= alpha_val
-                            reg_sig(f)      = a(:,2);
+%                             reg_sig(f)      = a(:,2);
+%                             SPM_index(f)    = m;
+%                             f = f + 1;
+                        elseif a(:,3) <= alpha_val
+                            reg_sig(f)      = a(:,3);
                             SPM_index(f)    = m;
                             f = f + 1;
                         elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val
-                            reg_sig(f)      = a(:,1);
-                            SPM_index(f)    = m;
-                            f = f + 1;
+%                             reg_sig(f)      = a(:,1);
+%                             SPM_index(f)    = m;
+%                             f = f + 1;
                         end
                     end
                 end

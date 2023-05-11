@@ -25,8 +25,9 @@ inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name
     'Enter number of study groups:','Would you like to overwrite previous data (No = 0, Yes = 1)?',...
     'How often would you like to save the .mat file in case of interruptions?',...
     'Do you want to calculate surface area on both bone surfaces? (No = 0, Yes = 1)(will double the amount of time)',...
-    'Would you like to save coverage area .stl files for each time step? (No = 0, Yes = 1)'},...
-    'User Inputs',[1 100],{'Calcaneus','Talus','1','1','50','0','0'});
+    'Would you like to save coverage area .stl files for each time step? (No = 0, Yes = 1)'...
+    'Would you like to troubleshoot? (No = 0, Yes = 1)'},...
+    'User Inputs',[1 100],{'Calcaneus','Talus','1','1','50','0','0','0'});
 
 bone_names = {inp_ui{1},inp_ui{2}};
 
@@ -44,6 +45,8 @@ coverage_area_check = str2double(inp_ui{6});
 
 % Save the coverage area .stl files and pick which frames
 save_stl = str2double(inp_ui{7});
+
+troubleshoot_mode = str2double(inp_ui{8});
 
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
@@ -82,7 +85,7 @@ data_dir = string(uigetdir());
 % .github repository. 
 
 %% Clean Slate
-clc; close all; clearvars -except bone_names study_num overwrite_data save_interval coverage_area_check save_stl_frame save_stl data_dir
+clc; close all; clearvars -except bone_names study_num overwrite_data save_interval coverage_area_check save_stl_frame save_stl data_dir troubleshoot_mode
 addpath(sprintf('%s\\Scripts',pwd))
 addpath(sprintf('%s\\Mean_Models',data_dir)) 
 
@@ -238,21 +241,21 @@ end
 
 %% Identify Indices on Bones from SSM Local Particles
 fprintf('Local Particles -> Bone Indices\n')
+fprintf('   Iterative Closest Point Alignment to Correspondence Particles\n')
 g = fieldnames(Data);
+
 for subj_count = 1:length(g)
     for bone_count = 1:length(bone_names)
         %%
         if isfield(Data.(string(subjects(subj_count))).(string(bone_names(bone_count))),'CP') == 1
-            flip_it = 1;
-            flip_dir = 1;
-            while flip_it == 1
-            % This section is important! If the bones used to create the
-            % shape model were aligned OUTSIDE of ShapeWorks than this
-            % section is necessary. If they were aligned and groomed
-            % WITHIN ShapeWorks than this is redundant. Rather than having
-            % more user input this is implemented.
+            fprintf('      Aligning Subject %s\n',string(subjects(subj_count)))
+                % This section is important! If the bones used to create the
+                % shape model were aligned OUTSIDE of ShapeWorks than this
+                % section is necessary. If they were aligned and groomed
+                % WITHIN ShapeWorks than this is redundant. Rather than having
+                % more user input this is implemented.
 
-            CP = Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).CP;
+                CP = Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).CP;
 
                 q = CP';
                 p = Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).(string(bone_names(bone_count))).Points;
@@ -270,45 +273,41 @@ for subj_count = 1:length(g)
                         p = [p(:,1) p(:,2) p(:,3)]';
                 end
 
-                if flip_dir == 1
-                % calculate the rotations and translation matrices
-    %             Jakob Wilm (2022). Iterative Closest Point (https://www.mathworks.com/matlabcentral/fileexchange/27804-iterative-closest-point), MATLAB Central File Exchange.
-                [R,T] = icp(q,p,1000,'Matching','kDtree');
+                %% Error ICP
+                for icp_count = 0:11
+                    if icp_count < 4 % x-axis rotation
+                        Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
+                    elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
+                        Rt = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
+                    elseif icp_count >= 8 % z-axis rotation
+                        Rt = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
+                    end
 
-                P = (R*p + repmat(T,1,length(p)))';                     
-                elseif flip_dir == 2
-                    Rt = [1 0 0;0 cosd(180) -sind(180);0 sind(180) cosd(180)];
-                    p =  Rt*P';
-                    
-                    [R,T] = icp(q,p,1000,'Matching','kDtree');
-                    
-                    P = (R*p + repmat(T,1,length(p)))';                   
-                elseif flip_dir == 3
-                   Rt = [cosd(180) 0 sind(180); 0 1 0; -sind(180) 0 cosd(180)];
-                   p =  Rt*P';
-                    [R,T] = icp(q,p,1000,'Matching','kDtree');
-                    
-                    P = (R*p + repmat(T,1,length(p)))';                   
-                elseif flip_dir == 4
-                   Rt = [cosd(180) -sind(180) 0; sind(180) cosd(180) 0; 0 0 1];
-                   p =  Rt*P';
-                    [R,T] = icp(q,p,1000,'Matching','kDtree');
-                    
-                    P = (R*p + repmat(T,1,length(p)))';                   
-                elseif flip_dir > 4
-                    warning("Your input bone models may be incorrect, unable to pair correspondence particles with bone nodes");
-                    break
+                    P = Rt*p;                 
+    
+                    [R,T,ER] = icp(q,P,1000,'Matching','kDtree');
+                    P = (R*P + repmat(T,1,length(P)))';
+                    % 
+                    % figure()
+                    % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
+                    % hold on
+                    % plot3(P(:,1),P(:,2),P(:,3),'.k')
+                    % axis equal
+    
+                    ER_temp(icp_count+1)   = min(ER);
+                    ICP{icp_count+1}.P     = P;
                 end
+
+                %%
+                P = ICP{find(ER_temp == min(ER_temp))}.P;
+                ICP_group{subj_count}.P     = P;
+                ICP_group{subj_count}.CP    = CP;
+                clear ER_temp ICP
 
             %% Identify Nodes and CP
 
             % Find the .stl nodes and their respective correspondence
             % particles and save to Data structure
-            % figure()
-            % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
-            % hold on
-            % plot3(P(:,1),P(:,2),P(:,3),'.k')
-            % axis equal
                         
             tol = 2;
             i_pair = [];%zeros(length(CP(:,1)),2);
@@ -319,16 +318,100 @@ for subj_count = 1:length(g)
                 min_dist = (ROI(find(found_dist == min(found_dist))));
                 if isempty(min_dist) == 0
                     i_pair(r,:) = [r min_dist(1)];
-                    flip_it = 0;
-                elseif isempty(min_dist) == 1
-                    flip_dir = flip_dir + 1;
-                    break
                 end
                 clear found_dist min_dist ROI
             end
             Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).CP_Bone = i_pair;
         end
+        clear P CP
+    end
+end
+
+%% Troubleshoot Mode - ICP Alignment
+if troubleshoot_mode == 1
+    close all
+    for subj_count = 1:length(subjects)
+        figure()
+        B.faces        = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
+        % B.vertices     = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).Points;
+        B.vertices     = ICP_group{subj_count}.P;
+        patch(B,'FaceColor', [0.85 0.85 0.85], ...
+        'EdgeColor','none',...        
+        'FaceLighting','gouraud',...
+        'FaceAlpha',1,...
+        'AmbientStrength', 0.15);
+        material('dull');
+        alpha(0.5);
+        hold on
+        CP = ICP_group{subj_count}.CP;
+        plot3(CP(:,1),CP(:,2),CP(:,3),'.k')
+        hold on
+        % set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]); %[-0.0036 0.0306 0.5073 0.9694]
+        axis equal
+        set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
+        camlight(0,0)
+        title(strrep(string(subjects(subj_count)),'_',' '))
+    end
+    uiwait(msgbox({'Please check and make sure that each bone is aligned to their correspondence particles!','','       Do not select OK until you are ready to move on!'}))
+    q = questdlg({'Did the bones align to the correspondence particles correctly?','Yes to continue troubleshooting (will proceed)','No to abort script (will stop)','Cancel to stop troubleshooting (will proceed)'});
+    if isequal(q,'No')
+        error('Aborted running the script! Please double check your correspondence particle .particles files OR the bone model .stl files if they did not align properly')
+    elseif isequal(q,'Cancel')
+        troubleshoot_mode = 0;
+    elseif isequal(q,'Yes')
+        fprintf('Continuing from troubleshoot:\n')
+        close all
+    end
+end
+
+%% Troubleshoot Mode - Kinematics
+if troubleshoot_mode == 1
+    close all
+    frame_count = 1;
+    for subj_count = 1:length(subjects)
+        clear temp
+        for bone_count = 1:length(bone_names)
+            kine_data = Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).Kinematics;
+            R = [kine_data(frame_count,1:3);kine_data(frame_count,5:7);kine_data(frame_count,9:11)];
+            temp{bone_count} = (R*Data.(string(subjects(subj_count))).(string(bone_names(bone_count))).(string(bone_names(bone_count))).Points')';
+            temp{bone_count} = [temp{bone_count}(:,1)+kine_data(frame_count,4), temp{bone_count}(:,2)+kine_data(frame_count,8), temp{bone_count}(:,3)+kine_data(frame_count,12)];
         end
+        figure()
+        B.faces        = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
+        B.vertices     = temp{1};
+
+        A.faces        = Data.(string(subjects(subj_count))).(string(bone_names(2))).(string(bone_names(2))).ConnectivityList;
+        A.vertices     = temp{2};        
+        patch(B,'FaceColor', [0 1 0], ...
+        'EdgeColor','none',...        
+        'FaceLighting','gouraud',...
+        'FaceAlpha',1,...
+        'AmbientStrength', 0.15);
+        material('dull');
+        hold on
+        patch(A,'FaceColor', [0 1 1], ...
+        'EdgeColor','none',...        
+        'FaceLighting','gouraud',...
+        'FaceAlpha',1,...
+        'AmbientStrength', 0.15);
+        material('dull');
+        hold on
+        % set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]); %[-0.0036 0.0306 0.5073 0.9694]
+        axis equal
+        set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
+        camlight(0,0)
+        title(strrep(string(subjects(subj_count)),'_',' '))
+        legend(bone_names)
+    end
+    uiwait(msgbox({'Please check and make sure that both bones are transformed correctly','','       Do not select OK until you are ready to move on!'}))
+    q = questdlg({'Are they aligned correctly?','Yes to continue troubleshooting (will proceed)','No to abort script (will stop)','Cancel to stop troubleshooting (will proceed)'});
+    if isequal(q,'No')
+        error('Aborted running the script! Please double check that your kinematics .txt files OR bone model .stl files are correct if not transformed correctly')
+    elseif isequal(q,'Cancel')
+        troubleshoot_mode = 0;
+    elseif isequal(q,'Yes')
+        fprintf('Continuing from troubleshoot:\n')
+        close all
     end
 end
 
@@ -401,36 +484,7 @@ for group_count = 1:length(groups)
                 end
                 
                 clear R bone_data kine_data
-            end        
-
-%% Troubleshoot
-% If you want to check and see if the transformations are moving the bones
-% correctly uncomment this section and run. Be aware that MATLAB 3D viewing
-% has its limitations and they may be at a weird viewing perspective.
-
-% subj_trouble = string(g(1));
-% TR.vertices =  Data.(subj_trouble).(string(bone_names(1))).(string(bone_names(1))).Points;
-% TR.faces    =  Data.(subj_trouble).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
-% 
-% TR1.vertices =  Data.(subj_trouble).(string(bone_names(2))).(string(bone_names(2))).Points;
-% TR1.faces    =  Data.(subj_trouble).(string(bone_names(2))).(string(bone_names(2))).ConnectivityList;
-% 
-% figure()
-% patch(TR,'FaceColor', [1 1 0], ...
-% 'EdgeColor','none',...        
-% 'FaceLighting','gouraud',...
-% 'AmbientStrength', 0.15);
-% camlight(0,0);
-% material('dull');
-% hold on
-% patch(TR1,'FaceColor', [0 0 1], ...
-% 'EdgeColor','none',...        
-% 'FaceLighting','gouraud',...
-% 'AmbientStrength', 0.15);
-% camlight(0,0);
-% material('dull');
-% hold on
-% axis equal            
+            end       
             
              %% Find if intersecting and calculate surface area
             for bone_count = 1:length(bone_names)
@@ -830,7 +884,7 @@ for group_count = 1:length(groups)
             %% Clear Variables and Save Every X Number of Frames
             clear Temp_STL
             Temp_STL = temp_STL;
-            clearvars -except pool data_dir fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups
+            clearvars -except pool data_dir fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups troubleshoot_mode
             
             MF = dir(fullfile(sprintf('%s\\Outputs',data_dir)));
             if isempty(MF) == 1

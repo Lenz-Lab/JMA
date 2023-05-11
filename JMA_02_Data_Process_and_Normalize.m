@@ -16,11 +16,13 @@ clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 
 %% Select Folders
-inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name of opposite bone:','Enter Number of study groups:'},'User Inputs',[1 100],{'Calcaneus','Talus','1'});
+inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name of opposite bone:','Enter Number of study groups:','Would you like to troubleshoot? (No = 0, Yes = 1)'},'User Inputs',[1 100],{'Calcaneus','Talus','1','0'});
 
 bone_names = {inp_ui{1},inp_ui{2}};
 
 study_num  = inp_ui{3};
+
+troubleshoot_mode = str2double(inp_ui{4});
 
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
@@ -76,8 +78,45 @@ for n = 1:str2double(study_num)
     end
 end
 
-%%
 subjects = fieldnames(Data);
+
+%% Troubleshoot Mode
+if troubleshoot_mode == 1
+    close all
+    for subj_count = 1:length(subjects)
+        figure()
+        % B.faces        = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
+        % B.vertices     = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).Points;
+        % patch(B,'FaceColor', [0.85 0.85 0.85], ...
+        % 'EdgeColor','none',...        
+        % 'FaceLighting','gouraud',...
+        % 'FaceAlpha',1,...
+        % 'AmbientStrength', 0.15);
+        % material('dull');
+        % alpha(0.5);
+        % hold on
+        CP_points = Data.(string(subjects(subj_count))).(string(bone_names(1))).CP;
+        plot3(CP_points(:,1),CP_points(:,2),CP_points(:,3),'.k')
+        hold on
+        CP = Data.(string(subjects(subj_count))).MeasureData.F_1.Pair(:,1);
+        plot3(CP_points(CP,1),CP_points(CP,2),CP_points(CP,3),'ob','linewidth',2)
+        % set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]); %[-0.0036 0.0306 0.5073 0.9694]
+        axis equal
+        set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
+        camlight(0,0)
+        title(strrep(string(subjects(subj_count)),'_',' '))
+    end
+    uiwait(msgbox({'Please check and make sure that their are correspondence particles cirlced in blue in the correct joint of interest (only one time step!)','','       Do not select OK until you are ready to move on!'}))
+    q = questdlg({'Are there particles circled in blue in the correct joint/area?','Yes to continue troubleshooting (will proceed)','No to abort script (will stop)','Cancel to stop troubleshooting (will proceed)'});
+    if isequal(q,'No')
+        error('Aborted running the script! Please double check that your kinematics .txt files, bone model .stl files, OR correspondence particles .particles files are correct when you ran JMA_01')
+    elseif isequal(q,'Cancel')
+        troubleshoot_mode = 0;
+    elseif isequal(q,'Yes')
+        fprintf('Continuing from troubleshoot:\n')
+        close all
+    end    
+end
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%% Data Analysis %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Data Analysis:\n')
@@ -262,7 +301,7 @@ for n = 1:length(subjects)
         end    
     end
 end
-clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g
+clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode
 
 %%
 
@@ -296,7 +335,8 @@ for study_pop = 1:length(g)
                         end
                         % temp(find(isnan(temp))) = [];
                         DataOut_Mean.(string(gg(CItoDist))).(string(g(study_pop)))(n,m) = mean(temp);
-                        if length(temp) >= floor(length(subjects)) % How many articulating CP in order to be included
+                        DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {[]};
+                        if length(temp) == floor(length(subjects)) % How many articulating CP in order to be included
                             DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {temp};
                         end
                     end
@@ -312,6 +352,7 @@ end
 % SPM needs to have data for each person at a particle for it to be
 % compared. So SPM_check_list will have a 1 at that particle at that frame
 % if it does.
+gg = fieldnames(DataOut);
 gg_check = gg(1);
 g = fieldnames(subj_group);
 for study_pop = 1:length(g)
@@ -328,6 +369,7 @@ for study_pop = 1:length(g)
                     clear temp
                 end
             end
+            SPM_check_list.(string(g(study_pop))){n,m} = 0;
             if length(gg_find) == length(gg)
                 SPM_check_list.(string(g(study_pop))){n,m} = 1;
             end
@@ -415,6 +457,7 @@ perc_temp           = IntData.(string(subjects(1))).Frame(:,1);
 
 % Rows are correspondence particle indices
 % Columns are percentages of the normalized activity
+
 A.DataOut           = DataOut;          % Participant-specific normalized data at each particle
 A.DataOut_Mean      = DataOut_Mean;     % Group mean normalized results at each particle
 A.DataOut_SPM       = DataOut_SPM;      % Compiled group normalized data at each particle

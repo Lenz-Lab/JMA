@@ -209,28 +209,59 @@ for g_count = inpdata
             for group_count = 1:length(groups)
                 temp = [];
                 for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)
-                    temp = [temp DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                    if isempty(DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m})
+                        temp = [temp NaN];
+                    else
+                        temp = [temp DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                    end
                 end
-                temp(find(isnan(temp))) = [];
+                % temp(find(isnan(temp))) = [];
                 statdata.(string(groups(group_count))) = temp;
                 for nn = 1:length(temp)
                     agrp_id(f) = group_count;
                     f = f + 1;
                 end
                 data_all = [data_all temp];
-            end         
-          
+            end
+
+            nan_indices = find(isnan(data_all));
+
+            for i = 1:length(nan_indices)
+                index = nan_indices(i);
+
+                if index > 18
+                    indxa = index - 18;
+                    indxb = index - 9;
+                elseif index < 10
+                    indxa = index + 9;
+                    indxb = index + 18;
+                else
+                    indxa = index + 9;
+                    indxb = index - 9;
+                end
+                data_all(indxa) = NaN;
+                data_all(indxb) = NaN;
+                agrp_id(indxa) = NaN;
+                agrp_id(indxb) = NaN;
+                agrp_id(index) = NaN;
+            end
+
+            data_all = data_all(~isnan(data_all));
+            agrp_id = agrp_id(~isnan(agrp_id));
+
             if isempty(data_all) == 0 && isempty(statdata.(data_1)) == 0 && isempty(statdata.(data_2)) == 0
                 if length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5 % the normality test will not run on arrays smaller than 5
-                    norm_test = normalitytest(data_all);        
+                    if length(data_all) >= 9
+                        norm_test = normalitytest(data_all);
+                    end
                 else
                     norm_test(8,3) = 0;
-                end  
+                end
 
                 if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                         && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                     [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);
-                    
+
                     %mann-whitney t-test
                     % Wilcoxon rank sum test
                     [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
@@ -247,11 +278,9 @@ for g_count = inpdata
 
                         % Define the levels of the repeated measure
                         levels = groups';
-                        if length(data_all) ~= 27
-                            continue
-                        end
 
-                        data_temp = reshape(data_all,9,3);
+
+                        data_temp = reshape(data_all,length(data_all)/3,3);
 
                         % Create a table with the data
                         T = array2table(data_temp, 'VariableNames', {'Time_1', 'Time_2', 'Time_3'});
@@ -263,32 +292,35 @@ for g_count = inpdata
                         within_design = table([1 2 3]', 'VariableNames', {'TimePoint'});
 
                         % Run the repeated measures ANOVA
+                        warning('off','all')
                         rm = fitrm(T, 'Time_1-Time_3~1', 'WithinDesign', within_design);
                         pd_parametric_rm = ranova(rm);
 
                         if comp_flip == 0
-                            c = multcompare(pd_parametric,'display','off');
-                            p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+                            % c = multcompare(pd_parametric,'display','off');
+                            % p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
 
                             c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
                             c = c{:,:};
                             p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
 
-                            c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                            p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+                            % c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                            % p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
                         elseif comp_flip == 1
-                            c = multcompare(pd_parametric,'display','off');
-                            p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                            % c = multcompare(pd_parametric,'display','off');
+                            % p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
 
                             c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
                             c = c{:,:};
                             p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
-
-                            c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                            p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                            % 
+                            % c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                            % p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
                         end
 
-                        Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, p_parametric_rm, norm_test(8,3)];% Shapiro-Wilk Normality test
+                        % Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, p_parametric_rm, norm_test(8,3)];% Shapiro-Wilk Normality test
+                        Results.(string(g(g_count))){n,m} = [p_parametric_rm, norm_test(8,3)];% Shapiro-Wilk Normality test
+
                         if norm_test(8,3) == 0
                             not_normal.(string(g(g_count))) = 0;
                         end
@@ -298,69 +330,6 @@ for g_count = inpdata
         end
     end
 end
-
-            %%
-            % temp = [];
-            % f = 1;
-            % for k = 1:length(groups)
-            %     for subj_count = 1:length(subj_group.(string(groups(k))).SubjectList)
-            %         temp = [temp; DataOut.(string(g(g_count))).(string(subj_group.(string(groups(k))).SubjectList(subj_count))){n,m}];
-            %         grp_id{k} = f:(length(temp));
-            %         f = f + length(data.(string(groups(k)))(:,m));
-            %     end
-            % end
-            % Data_All.(string(g(g_count))){n,m} = temp;
-            % 
-            % 
-            % temp = Data_All.(string(g(g_count))){n,m};
-            % temp(find(isnan(temp))) = [];
-
-    %         if length(temp) >= 5
-    %             norm_test = normalitytest(temp');        
-    %         else
-    %             norm_test(8,3) = 0;
-    %         end
-    %         if length(groups) == 2 && isempty(temp) == 0
-    %             [~, pd_parametric] = ttest2(temp(grp_id{1}),temp(grp_id{2}),0.05);
-    % 
-    %             %mann-whitney t-test
-    %             % Wilcoxon rank sum test
-    %             [pd_nonparametric, ~, ~] = ranksum(temp(grp_id{1}),temp(grp_id{2}),'alpha',0.05,'tail','both');
-    % 
-    %             Results.(string(g(g_count))){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
-    %         elseif length(groups) > 2
-    %             agrp_id = zeros(1,length(temp));
-    %             for nn = 1:length(groups)
-    %                 agrp_id(grp_id{nn}) = nn;
-    %             end
-    % 
-    %             clear p_parametric p_nonparametric
-    %             [~, ~, pd_parametric]        = anova1(temp,agrp_id,'off');
-    %             [~, ~, pd_nonparametric]     = kruskalwallis(temp,agrp_id,'off');
-    % 
-    %             if comp_flip == 0
-    %                 c = multcompare(pd_parametric,'display','off');
-    %                 p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-    % 
-    %                 c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-    %                 p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-    %             elseif comp_flip == 1
-    %                 c = multcompare(pd_parametric,'display','off');
-    %                 p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-    % 
-    %                 c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-    %                 p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-    %             end
-    % 
-    %             Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
-    % 
-    %         end
-    %         if norm_test(8,3) == 0
-    %             not_normal.(string(g(g_count))) = 0;
-    %         end            
-    %     end               
-    % end
-% end
 
 %% Report Normality
 for n = 1:length(inpdata)
@@ -373,6 +342,7 @@ end
 
 %% Creates SPM Figures
 % Will create figures for congruence index and distance
+warning('on','all')
 close all
 plot_data_name = fieldnames(DataOut);
 % for plot_data = 1:length(plot_data_name)
@@ -446,8 +416,8 @@ for plot_data = inpdata
 %                             reg_sig(f)      = a(:,2);
 %                             SPM_index(f)    = m;
 %                             f = f + 1;
-                        elseif a(:,3) <= alpha_val
-                            reg_sig(f)      = a(:,3);
+                        elseif a(:,1) <= alpha_val
+                            reg_sig(f)      = a(:,1);
                             SPM_index(f)    = m;
                             f = f + 1;
                         elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val

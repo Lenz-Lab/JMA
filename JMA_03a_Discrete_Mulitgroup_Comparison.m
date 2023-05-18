@@ -399,8 +399,9 @@ for plot_data = inpdata
         %         bone_combination = strcat(bone_combination,strcat(string(Bone_Data{bone_count}.bone_names(b)),'_'));
         %     end
         % end
-            tif_folder = sprintf('%s\\Results\\Multicompare_Particles_%s_%s\\%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),comparison_name,string(plot_data_name(plot_data)),string(groups(comparison(1))),string(groups(comparison(2))));
-        
+        % tif_folder = sprintf('%s\\Results\\Multicompare_Particles_%s_%s\\%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),comparison_name,string(plot_data_name(plot_data)),string(groups(comparison(1))),string(groups(comparison(2))));
+        tif_folder = sprintf('%s\\Results\\Multicompare_Particles_%s_%s_%s\\%s_%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),string(Bone_Data{1,1}.bone_names(1)),string(Bone_Data{1,1}.bone_names(2)),comparison_name,string(plot_data_name(plot_data)),string(groups(comparison(1))),string(groups(comparison(2))));
+
         if n == 1
             disp(tif_folder)
             fprintf('%s: %s vs %s\n',string(groups(comparison(1))),string(groups(comparison(1))),string(groups(comparison(2))))
@@ -500,7 +501,7 @@ for plot_data = inpdata
         % Will need to be stitched together using ImageJ or another
         % software package
         % for b = 1:bone_amount
-        %     NodalIndex{b}   = NewBoneData{b}.temp(:,1);
+        %     NodalIndex{b}   = NewBoneData{b}.temp(:,1);   
         %     NodalData{b}    = NewBoneData{b}.temp(:,2);
         % end
         % if isempty(NewBoneData{bone_count}.temp) == 0

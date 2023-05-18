@@ -19,8 +19,9 @@ inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',
     'Enter distance upper limit:','Enter distance lower limit:','View Perspective(1)',...
     'View Perspective(2)','Select viewing perspective? (Yes = 1, No = 0)','Alpha Value',...
     'What is the minimum percentage of patients that must be included for Group 1? (%)'...
-    'What is the minimum percentage of patients that must be included for Group 2? (%)'}...
-    ,'User Inputs',[1 100],{'','6','0','20','45','0','0.05','100','100'});
+    'What is the minimum percentage of patients that must be included for Group 2? (%)'...
+    'Do you want to run a repeated measures ANOVA? (Yes = 1, No = 0)'}...
+    ,'User Inputs',[1 100],{'','6','0','20','45','0','0.05','100','100','0'});
 
 % Name of the comparison for figures and results so that different ANOVA
 % conditions can be easily identified by the user.
@@ -49,6 +50,9 @@ alpha_val = str2double(inp_ui{7});
 
 % percentage of partipants to be included in the analysis
 perc_part = [str2double(inp_ui{8}) str2double(inp_ui{9})];
+
+% Repeated Measures ANOVA on/off
+rmanova_onoff = str2double(inp_ui{10});
 
 %% 
 inp_ui = inputdlg({'How many bones would you like to include?'},'Multiple Bone Visualization',[1 50],{'1'});
@@ -211,6 +215,10 @@ for n = 1:min(max_cp)
     end
 end
 
+% Define your within-subjects and between-subjects factors
+within_factor = 'Time';
+between_factor = ''; % Leave blank if you don't have a between-subjects factor
+
 %% Run the stats tests
 for bone_count = 1:bone_amount
     fs = 1;
@@ -227,23 +235,63 @@ for bone_count = 1:bone_amount
                 for group_count = 1:length(groups)
                     temp = [];
                     for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)
-                        temp = [temp Bone_Data{bone_count}.DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                        if rmanova_onoff == 1
+                            if isempty(Bone_Data{bone_count}.DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m})
+                                temp = [temp NaN];
+                            else
+                                temp = [temp Bone_Data{bone_count}.DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                            end
+                        else
+                            temp = [temp Bone_Data{bone_count}.DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                        end
+
                     end
-                    temp(find(isnan(temp))) = [];
+                    if rmanova_onoff == 0
+                        temp(find(isnan(temp))) = [];
+                    end
                     statdata.(string(groups(group_count))) = temp;
                     for nn = 1:length(temp)
                         agrp_id(f) = group_count;
                         f = f + 1;
                     end
                     data_all = [data_all temp];
-                end         
-              
+                end
+
+                if rmanova_onoff == 1
+                    nan_indices = find(isnan(data_all));
+
+                    subj_length = length(subj_group.(string(groups(group_count))).SubjectList);
+
+                    for i = 1:length(nan_indices)
+                        index = nan_indices(i);
+
+                        if index > (subj_length*2)
+                            indxa = index - (subj_length*2);
+                            indxb = index - subj_length;
+                        elseif index < (subj_length+1)
+                            indxa = index + subj_length;
+                            indxb = index + (subj_length*2);
+                        else
+                            indxa = index + subj_length;
+                            indxb = index - subj_length;
+                        end
+                        data_all(indxa) = NaN;
+                        data_all(indxb) = NaN;
+                        agrp_id(indxa) = NaN;
+                        agrp_id(indxb) = NaN;
+                        agrp_id(index) = NaN;
+                    end
+
+                    data_all = data_all(~isnan(data_all));
+                    agrp_id = agrp_id(~isnan(agrp_id));
+                end
+
                 if isempty(data_all) == 0 && isempty(statdata.(data_1)) == 0 && isempty(statdata.(data_2)) == 0
-                    if length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5 % the normality test will not run on arrays smaller than 5
-                        norm_test = normalitytest(data_all);        
+                    if (length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5) && rmanova_onoff == 0 % the normality test will not run on arrays smaller than 5
+                        norm_test = normalitytest(data_all);
                     else
                         norm_test(8,3) = 0;
-                    end  
+                    end
     
                     if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                             && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
@@ -257,32 +305,69 @@ for bone_count = 1:bone_amount
                             NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
                         end
                     elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
-                            && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
+                            && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                         if isempty(data_all) == 0 && isempty(agrp_id) == 0
                             clear p_parametric p_nonparametric
                             [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
                             [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
-                            
-                            if comp_flip == 0
-                                c = multcompare(pd_parametric,'display','off');
-                                p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                    
-                                c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                            elseif comp_flip == 1
-                                c = multcompare(pd_parametric,'display','off');
-                                p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                    
-                                c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+
+                            if rmanova_onoff == 1
+                                levels = groups';
+
+                                data_temp = reshape(data_all,length(data_all)/3,3);
+
+                                % Create a table with the data
+                                T = array2table(data_temp, 'VariableNames', {'Time_1', 'Time_2', 'Time_3'});
+
+                                % Add a grouping variable for the repeated measure
+                                T.Time = repmat(levels, size(T,1),1);
+                                T.Time = categorical(T.Time);
+
+                                within_design = table([1 2 3]', 'VariableNames', {'TimePoint'});
+
+                                % Run the repeated measures ANOVA
+                                warning('off','all')
+                                rm = fitrm(T, 'Time_1-Time_3~1', 'WithinDesign', within_design);
+                                pd_parametric_rm = ranova(rm);
                             end
-                        
-                            NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+
+                            if comp_flip == 0
+                                if rmanova_onoff == 0
+                                    c = multcompare(pd_parametric,'display','off');
+                                    p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+
+                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                    p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+                                else
+                                    c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
+                                    c = c{:,:};
+                                    p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
+                                end
+
+                            elseif comp_flip == 1
+                                if rmanova_onoff == 0
+                                    c = multcompare(pd_parametric,'display','off');
+                                    p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+
+                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                    p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                                else
+                                    c = multcompare(rm,'TimePoint','ComparisonType','tukey-kramer');
+                                    c = c{:,:};
+                                    p_parametric_rm = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),5);
+                                end
+                            end
+
+                            if rmanova_onoff == 0
+                                NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+                            else
+                                NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [p_parametric_rm, norm_test(8,3)];% Shapiro-Wilk Normality test
+                            end
                             if norm_test(8,3) == 0
                                 not_normal.(string(g(g_count))) = 0;
                             end
                         end
-                    end 
+                    end
                 end
             end
         end
@@ -343,7 +428,7 @@ for plot_data = inpdata
     
             k = 1;
             f = 1;
-            % SPM_index = [];
+            SPM_index{bone_count} = [];
             for m = 1:length(NewBoneData{bone_count}.Results.(string(g(plot_data)))(:,1))
                 data_cons1 = [];
                 datd_cons1 = [];
@@ -379,21 +464,30 @@ for plot_data = inpdata
                 % if DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) > 0 && DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) <= Distance_Upper && DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_2))(m,n) <= Distance_Upper
                 %     temp(k,:) = [m DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n)];
                 %     k = k + 1;
-                % end              
-                a = NewBoneData{bone_count}.Results.(string(g(plot_data))){m,n};
-                if isempty(a) == 0 
-                    if length(a) > 1
-                        if a(:,1) > 0 && a(:,2) > 0
-                            if not_normal.(string(g(plot_data)))      == 0 && a(:,2) <= alpha_val
-                                reg_sig{bone_count}(f)      = a(:,2);
-                                SPM_index{bone_count}(f)    = m;
-                                f = f + 1;
-                            elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val
-                                reg_sig{bone_count}(f)      = a(:,1);
-                                SPM_index{bone_count}(f)    = m;
-                                f = f + 1;
+                % end
+                if rmanova_onoff == 0
+                    a = NewBoneData{bone_count}.Results.(string(g(plot_data))){m,n};
+                    if isempty(a) == 0
+                        if length(a) > 1
+                            if a(:,1) > 0 && a(:,2) > 0
+                                if not_normal.(string(g(plot_data)))      == 0 && a(:,2) <= alpha_val
+                                    reg_sig{bone_count}(f)      = a(:,2);
+                                    SPM_index{bone_count}(f)    = m;
+                                    f = f + 1;
+                                elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val
+                                    reg_sig{bone_count}(f)      = a(:,1);
+                                    SPM_index{bone_count}(f)    = m;
+                                    f = f + 1;
+                                end
                             end
                         end
+                    end
+                else
+                    a = NewBoneData{bone_count}.Results.(string(g(plot_data))){m,n};
+                    if (isempty(a) == 0) && (length(a) > 1) && (a(:,1) > 0) && (a(:,1) <= alpha_val)
+                        reg_sig{bone_count}(f)      = a(:,1);
+                        SPM_index{bone_count}(f)    = m;
+                        f = f + 1;
                     end
                 end
             end

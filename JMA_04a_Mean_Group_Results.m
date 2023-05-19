@@ -1,6 +1,6 @@
 clc,clear all,close all
-load('L:\Project_Data\P28_Subtalar_Joint_Cadaver_Phase01\13_Dynamic_Joint_Measure_Analysis\Control_ST_DPF_Neutral_Flat_01\Cadv_03\Data_Calcaneus_Talus_Cadv_03.mat')
-
+load('L:\Project_Data\P28_Subtalar_Joint_Cadaver_Phase01\13_Dynamic_Joint_Measure_Analysis\Control_ST_DPF_Neutral_Flat_01\Cadv_01\Data_Calcaneus_Talus_Cadv_01.mat')
+addpath(sprintf('%s\\Scripts',pwd))
 bone_alph{1} = 1;
 bone_alph{2} = 0.5;
 %%
@@ -85,7 +85,7 @@ end
 
 %%
 close all
-for frame_count = 1%:10;%length(fieldnames(Data.(string(g(subj_count))).MeasureData))
+for frame_count = 1:10;%length(fieldnames(Data.(string(g(subj_count))).MeasureData))
     disp(frame_count)
     clear temp R kine_data bone_data
     for bone_count = 1:length(bone_names)
@@ -152,6 +152,6 @@ for frame_count = 1%:10;%length(fieldnames(Data.(string(g(subj_count))).MeasureD
     perc_stance = frame_count;
     part_scatter = 1;
     % RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter,view_perspective,bone_alph,bone_amount)
-    RainbowFishMult(Bone,CP,NodalIndex,NodalData,[0 6],1,SPMIndex,frame_count,2,[-50,90],length(bone_names),bone_alph)
+    RainbowFishMult(Bone,CP,NodalIndex,NodalData,[0 6],2,SPMIndex,frame_count,2,[-50,90],length(bone_names),bone_alph)
 
 end

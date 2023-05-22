@@ -56,9 +56,11 @@ grp_prt = menu({'Do you want to group or participant-specific results?'},{'Group
 groups = g(indx(1));
 
 %%
+inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please which data to analyze','ListSize',[500 250]);
+
 if grp_prt == 1
     S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));
-    data_1 = groups;
+    data_1 = string(groups);
     for c = 1:length(S)
         temp = strsplit(S(c).name,'.');
         temp = strrep(temp(1),' ','_');
@@ -76,7 +78,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanShape = stlread(sprintf('%ss\\Mean_Models\\%s',data_dir,S(c).name));
+                MeanShape = stlread(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
             end
         end
     end
@@ -99,7 +101,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanCP = load(sprintf('%ss\\Mean_Models\\%s',data_dir,S(c).name));
+                MeanCP = load(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
             end
         end
     end    
@@ -132,8 +134,6 @@ elseif grp_prt == 2
             end
         end 
     end
-
-    inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please which data to analyze','ListSize',[500 250]);
 
     %%
     

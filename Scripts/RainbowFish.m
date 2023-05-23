@@ -1,4 +1,4 @@
-function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter,view_perspective)
+function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
 % RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter)
 % This function creates a figure for joint space measurement data. This
 % function will take the input data and bin them into a distribution from
@@ -21,12 +21,11 @@ function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMI
 % ColorMap_Flip = 2 from red to blue, with red being lowest values
 % SPMIndex      = indices of which particles are statistically significant
 % perc_stance   = current percentage of stance (shown on figure)
-% part_scatter  - changes the type of particles
-% part_scatter  = 1 is scatter plot
-% part_scatter  = 2 is particles loaded from .stl 
 %   (requires Bead.stl and Disc.stl to work)
 % view_perspective = [20 45] adjusts the viewing perspective of the images
 %   example view([20 45])
+% colormap_choice = name of MATLAB colormap that you would like to use for
+%   nodal values
 
 %% Function Information
 % Created by: Rich Lisonbee
@@ -37,9 +36,16 @@ function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMI
 % Version: 
 % Date: 
 
+%% 
+bone_amount = length(Bone);
+
 %% Create Bin Structure
-if exist('view_perspective') == 0
+if exist('view_perspective','var') == 0
     view_perspective = [20 45];
+end
+
+if exist('colormap_choice','var') == 0
+    colormap_choice = 'jet';
 end
 
 % Initialize variable for while loops
@@ -47,7 +53,7 @@ k = 1;
 
 % Set colormap, then close opened colormap
 if ColorMap_Flip ~=3
-    ColorMap2 = colormap(jet);
+    ColorMap2 = colormap(lower(colormap_choice));
     close
 end
 
@@ -163,89 +169,107 @@ end
 % Parallel for loop takes each data point from NodalData and pairs the index 
 % it with a ColorMap2 value (CMap output variable) using the previously
 % created bins
-for n = 1:length(NodalData(:,1))
-    k = 1;
-    while k <= ML
-        if NodalData(n,1) >= S.BinRange(k,1) && NodalData(n,1) < S.BinRange(k,2)
-            CMap(n,:) = ColorMap2(k,:);
+nn = 1;
+for bone_count = 1:bone_amount
+    if isempty(NodalData{bone_count}) == 0
+        for n = 1:length(NodalData{bone_count}(:,1))
+            k = 1;
+            while k <= ML
+                if NodalData{bone_count}(n,1) >= S.BinRange(k,1) && NodalData{bone_count}(n,1) < S.BinRange(k,2)
+                    CMap{bone_count}(n,:) = ColorMap2(k,:);
+                end
+                k = k + 1;
+            end
         end
-        k = k + 1;
+    else
+        CMap{bone_count} = [];
     end
 end
 
-%% Create Figure With Face Forward Particles (Difference)
-if part_scatter == 2 && ColorMap_Flip < 3
+%% Create Figure With Face Forward Particles
 P = stlread('Bead.stl');
 PP.Points = P.Points/max(max(P.Points));
 T = stlread('Disc.stl');
 TT.Points = T.Points/max(max(T.Points));
- 
-B.faces        = Bone.ConnectivityList;
-B.vertices     = Bone.Points;
 
 Ptemp.faces     = P.ConnectivityList;
-Ptemp.vertices  = PP.Points*0.85;
+Ptemp.vertices  = PP.Points*0.85*glyph_size;
 
 Pspm.faces      = T.ConnectivityList;
-Pspm.vertices   = TT.Points*1.2;    
-    
-bone_center = incenter(Bone);
-bone_normal = faceNormal(Bone);
+Pspm.vertices   = TT.Points*1.2*glyph_size;    
 
-figure('visible','off')
-% figure()
-patch(B,'FaceColor', [0.85 0.85 0.85], ...
-'EdgeColor','none',...        
-'FaceLighting','gouraud',...
-'AmbientStrength', 0.15);
-material('dull');
+if isequal(vis_toggle,0)
+    figure('visible','off')
+elseif isequal(vis_toggle,1)
+    figure()
+end
+for bone_count = 1:bone_amount
+    if exist('bone_alph','var') == 1
+        a = bone_alph{bone_count};
+    else
+        a = 1;
+    end    
+    B.faces        = Bone{bone_count}.ConnectivityList;
+    B.vertices     = Bone{bone_count}.Points;
+    patch(B,'FaceColor', [0.85 0.85 0.85], ...
+    'EdgeColor','none',...        
+    'FaceLighting','gouraud',...
+    'AmbientStrength', 0.15,...
+    'facealpha',a);
+    material('dull');
+    hold on
+    bone_center = incenter(Bone{bone_count});
+    bone_normal = faceNormal(Bone{bone_count});
 hold on
 set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]);
-for n = 1:length(NodalIndex(:,1))
-        PR = Ptemp;
-        PR.vertices = PR.vertices + MeanCP(NodalIndex(n,:),:);
-       
-    if NodalData(n,:) >=  CLimits(1) && NodalData(n,:) <= CLimits(2)
-        temp = find(NodalIndex(n,:) == SPMIndex);
-        if isempty(temp) == 1
-            patch(PR,'FaceColor', CMap(n,:), ...
-            'EdgeColor','none',...        
-            'FaceLighting','gouraud',...
-            'AmbientStrength', 0.15);
-            material('dull');
-            hold on
-        elseif isempty(temp) == 0
-            patch(PR,'FaceColor', CMap(n,:), ...
-            'EdgeColor','none',...        
-            'FaceLighting','gouraud',...
-            'AmbientStrength', 0.15);
-            material('dull');
-            hold on            
-            TR = Pspm;
-            temp = [];
-            temp = pdist2(bone_center,MeanCP(NodalIndex(n,:),:),'euclidean');
-            temp = find(temp == min(temp)); 
-            
-            r = [];
-            r = vrrotvec(bone_normal(temp(1),:),[0 0 1]);
-            R = vrrotvec2mat(r);
-            
-            P_rot = [];
-            P_rot = TR.vertices*R;
-            clear R Rx Ry Rz            
-            
-            TR.vertices = P_rot + MeanCP(NodalIndex(n,:),:);
-            
-            color_spm = [1 0 1];                
-            patch(TR,'FaceColor', color_spm, ...
-            'EdgeColor','none',...        
-            'FaceLighting','flat',...
-            'FaceAlpha',1,...
-            'AmbientStrength', 0.15) %,...
-            material('dull'); 
-            clear TR
-            hold on
+if isempty(NodalIndex{bone_count}) == 0
+    for n = 1:length(NodalIndex{bone_count}(:,1))
+            PR = Ptemp;
+            PR.vertices = PR.vertices + MeanCP{bone_count}(NodalIndex{bone_count}(n,:),:);
+           
+        if NodalData{bone_count}(n,:) >=  CLimits(1) && NodalData{bone_count}(n,:) <= CLimits(2)
+            temp = find(NodalIndex{bone_count}(n,:) == SPMIndex{bone_count});
+            if isempty(temp) == 1 && isempty(CMap{bone_count}) == 0
+                patch(PR,'FaceColor', CMap{bone_count}(n,:), ...
+                'EdgeColor','none',...        
+                'FaceLighting','gouraud',...
+                'AmbientStrength', 0.15);
+                material('dull');
+                hold on
+            elseif isempty(temp) == 0 && isempty(CMap{bone_count}) == 0
+                patch(PR,'FaceColor', CMap{bone_count}(n,:), ...
+                'EdgeColor','none',...        
+                'FaceLighting','gouraud',...
+                'AmbientStrength', 0.15);
+                material('dull');
+                hold on            
+                TR = Pspm;
+                temp = [];
+                temp = pdist2(bone_center,MeanCP{bone_count}(NodalIndex{bone_count}(n,:),:),'euclidean');
+                temp = find(temp == min(temp)); 
+                
+                r = [];
+                r = vrrotvec(bone_normal(temp(1),:),[0 0 1]);
+                R = vrrotvec2mat(r);
+                
+                P_rot = [];
+                P_rot = TR.vertices*R;
+                clear R Rx Ry Rz            
+                
+                TR.vertices = P_rot + MeanCP{bone_count}(NodalIndex{bone_count}(n,:),:);
+                
+                color_spm = circle_color;                
+                patch(TR,'FaceColor', color_spm, ...
+                'EdgeColor','none',...        
+                'FaceLighting','flat',...
+                'FaceAlpha',1,...
+                'AmbientStrength', 0.15) %,...
+                material('dull'); 
+                clear TR
+                hold on
+            end
         end
+    end
     end
 end
 hold on
@@ -255,9 +279,9 @@ set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor
 view(view_perspective)
 camlight(0,0)
 if ColorMap_Flip == 1
-    colormap jet
+    colormap(colormap_choice)
 elseif ColorMap_Flip == 2
-    colormap(flipud(jet))
+    colormap(flipud(colormap_choice))
 end
 ttl = title(sprintf('%d %%',perc_stance));
 ttl.FontSize = 32;
@@ -265,133 +289,4 @@ C = colorbar;
 C.FontSize = 32;
 caxis([CLimits(1,1),CLimits(1,2)])
 set(C, 'ylim',[CLimits(1,1),CLimits(1,2)])
-end
 
-
-%% Create Figure With Face Forward Particles
-if part_scatter == 2 && ColorMap_Flip == 3
-P = stlread('Bead.stl');
-PP.Points = P.Points/max(max(P.Points));
-T = stlread('Disc.stl');
-TT.Points = T.Points/max(max(T.Points));
- 
-B.faces        = Bone.ConnectivityList;
-B.vertices     = Bone.Points;
-
-Ptemp.faces     = P.ConnectivityList;
-Ptemp.vertices  = PP.Points*0.85;
-
-Pspm.faces      = T.ConnectivityList;
-Pspm.vertices   = TT.Points*1.2;    
-    
-    
-bone_center = incenter(Bone);
-bone_normal = faceNormal(Bone);
-
-figure()
-patch(B,'FaceColor', [0.85 0.85 0.85], ...
-'EdgeColor','none',...        
-'FaceLighting','gouraud',...
-'AmbientStrength', 0.15);
-material('dull');
-hold on
-set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]);
-for n = 1:length(NodalIndex(:,1))
-        PR = Ptemp;
-        PR.vertices = PR.vertices + MeanCP(NodalIndex(n,:),:);
-       
-%     if NodalData(n,:) >=  CLimits(1) && NodalData(n,:) <= CLimits(2)
-    if NodalData(n,:) < 999
-        temp = find(NodalIndex(n,:) == SPMIndex);
-        if isempty(temp) == 1
-            patch(PR,'FaceColor', CMap(n,:), ...
-            'EdgeColor','none',...        
-            'FaceLighting','gouraud',...
-            'AmbientStrength', 0.15);
-            material('dull');
-            hold on
-        elseif isempty(temp) == 0
-            patch(PR,'FaceColor', CMap(n,:), ...
-            'EdgeColor','none',...        
-            'FaceLighting','gouraud',...
-            'AmbientStrength', 0.15);
-            material('dull');
-            hold on            
-            TR = Pspm;
-            temp = [];
-            temp = pdist2(bone_center,MeanCP(NodalIndex(n,:),:),'euclidean');
-            temp = find(temp == min(temp)); 
-            
-            r = [];
-            r = vrrotvec(bone_normal(temp(1),:),[0 0 1]);
-            R = vrrotvec2mat(r);
-            
-            P_rot = [];
-            P_rot = TR.vertices*R;
-            clear R Rx Ry Rz            
-            
-            TR.vertices = P_rot + MeanCP(NodalIndex(n,:),:);
-            
-            color_spm = [0 0 0];
-            patch(TR,'FaceColor', color_spm, ...
-            'EdgeColor','none',...        
-            'FaceLighting','flat',...
-            'FaceAlpha',1,...
-            'AmbientStrength', 0.15) %,...
-            material('dull'); 
-            clear TR
-            hold on
-        end
-    end
-    if NodalData(n,:) == 999
-        patch(PR,'FaceColor', [0.85 0.85 0.85], ...
-        'EdgeColor','none',...        
-        'FaceLighting','gouraud',...
-        'AmbientStrength', 0.15,'facealpha',0.5);
-        material('dull');
-        hold on
-%         purple    [0.4940 0.1840 0.5560]
-%         pink      [1 0.4118 0.7059]
-        temp = find(NodalIndex(n,:) == SPMIndex);
-        if isempty(temp) == 0            
-            TR = Pspm;
-            temp = [];
-            temp = pdist2(bone_center,MeanCP(NodalIndex(n,:),:),'euclidean');
-            temp = find(temp == min(temp)); 
-            
-            r = [];
-            r = vrrotvec(bone_normal(temp(1),:),[0 0 1]);
-            R = vrrotvec2mat(r);
-            
-            P_rot = [];
-            P_rot = TR.vertices*R;
-            clear R Rx Ry Rz            
-            
-            TR.vertices = P_rot + MeanCP(NodalIndex(n,:),:);
-            
-            color_spm = [0 0 0];
-            patch(TR,'FaceColor', color_spm, ...
-            'EdgeColor','none',...        
-            'FaceLighting','flat',...
-            'FaceAlpha',1,...
-            'AmbientStrength', 0.15) %,...
-            material('dull'); 
-            clear TR
-            hold on
-        end
-    end
-end
-hold on
-axis equal
-grid off
-set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
-view(view_perspective)
-camlight(0,0);
-colormap(ColorMap2)
-ttl = title(sprintf('%d %%',perc_stance));
-ttl.FontSize = 32;
-C = colorbar;
-C.FontSize = 32;
-caxis([CLimits(1,1),CLimits(1,2)])
-set(C, 'ylim',[CLimits(1,1),CLimits(1,2)])
-end

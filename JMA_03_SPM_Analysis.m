@@ -175,12 +175,7 @@ for g_count = 1:inpdata
                         section2{k1}        = data2(:,ix0(k1):ix1(k1));    
                         pperc_stance{k1}    = perc_stance(ix0(k1):ix1(k1),:); 
                     end
-                    % ne0 = find(data2(1,:)~=0);                      % Nonzero Elements
-                    % ix0 = unique([ne0(1) ne0(diff([0 ne0])>1)]);    % Segment Start Indices
-                    % ix1 = ne0([find(diff(ne0)>1) length(ne0)]);     % Segment End Indices
-                    % for k1 = 1:length(ix0)
-                    %     section2{k1} = data2(:,ix0(k1):ix1(k1));    % (Included the column)
-                    % end
+
                     reg_sig.(string(g(g_count)))(n,:) = {[]};
                     ss = 1;
                     for s = 1:length(section1)
@@ -214,7 +209,7 @@ for plot_data = inpdata
     N_length = [];
     for n = 1:max_frames
         %% Create directory to save .tif images
-        tif_folder = sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2));
+        tif_folder = sprintf('%s\\Results\\SPM_%s_%s_%s\\%s_%s_vs_%s\\',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2));
         
         if n == 1
             disp(tif_folder)
@@ -281,7 +276,7 @@ for plot_data = inpdata
     end
     %%
     fprintf('Creating video...\n')
-    video = VideoWriter(sprintf('%s\\Results\\SPM_Particles_%s_%s_%s\\%s_%s_vs_%s.mp4',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2))); % Create the video object.
+    video = VideoWriter(sprintf('%s\\Results\\SPM_%s_%s_%s\\%s_%s_vs_%s.mp4',data_dir,string(plot_data_name(plot_data)),string(bone_names(1)),string(bone_names(2)),string(plot_data_name(plot_data)),string(data_1),string(data_2))); % Create the video object.
     video.FrameRate = 7;
     open(video); % Open the file for writing
     for N = N_length

@@ -56,9 +56,11 @@ grp_prt = menu({'Do you want to group or participant-specific results?'},{'Group
 groups = g(indx(1));
 
 %%
+inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please which data to analyze','ListSize',[500 250]);
+
 if grp_prt == 1
     S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));
-    data_1 = groups;
+    data_1 = string(groups);
     for c = 1:length(S)
         temp = strsplit(S(c).name,'.');
         temp = strrep(temp(1),' ','_');
@@ -76,7 +78,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanShape = stlread(sprintf('%ss\\Mean_Models\\%s',data_dir,S(c).name));
+                MeanShape = stlread(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
             end
         end
     end
@@ -99,7 +101,7 @@ if grp_prt == 1
                 group_check = 1;
             end
             if bone_check == 1 && group_check == 1
-                MeanCP = load(sprintf('%ss\\Mean_Models\\%s',data_dir,S(c).name));
+                MeanCP = load(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
             end
         end
     end    
@@ -110,6 +112,7 @@ elseif grp_prt == 2
     
     data_1 = string(temp(indx));
     S = dir(fullfile(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1),'*.mat'));
+    addpath(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1))
     for c = 1:length(S)
         temp = strsplit(S(c).name,'.');
         temp = strrep(temp(1),' ','_');
@@ -131,6 +134,7 @@ elseif grp_prt == 2
             end
         end 
     end
+
     %%
     
     MeanCP = A.Data.(string(data_1)).(string(bone_names(1))).CP;
@@ -150,17 +154,38 @@ elseif grp_prt == 2
         end   
     elseif isfield(A.Data.(string(data_1)),'Side') == 0
             p = [p(:,1) p(:,2) p(:,3)]';
-    end           
+    end     
+
+    %% Error ICP
+    for icp_count = 0:11
+        if icp_count < 4 % x-axis rotation
+            Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
+        elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
+            Rt = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
+        elseif icp_count >= 8 % z-axis rotation
+            Rt = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
+        end
+
+        P = Rt*p;                 
+%             Jakob Wilm (2022). Iterative Closest Point (https://www.mathworks.com/matlabcentral/fileexchange/27804-iterative-closest-point), MATLAB Central File Exchange.
+        [R,T,ER] = icp(q,P,1000,'Matching','kDtree');
+        P = (R*P + repmat(T,1,length(P)))';
+        % 
+        % figure()
+        % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
+        % hold on
+        % plot3(P(:,1),P(:,2),P(:,3),'.k')
+        % axis equal
+
+        ER_temp(icp_count+1)   = min(ER);
+        ICP{icp_count+1}.P     = P;
+    end
+
+    P = ICP{find(ER_temp == min(ER_temp))}.P;
     
-    % calculate the rotations and translation matrices
-    %             Jakob Wilm (2022). Iterative Closest Point (https://www.mathworks.com/matlabcentral/fileexchange/27804-iterative-closest-point), MATLAB Central File Exchange.
-    [R,T] = icp(q,p,1000,'Matching','kDtree');
-    
-    temp_MeanShape.Points = (R*p + repmat(T,1,length(p)))';
+    temp_MeanShape.Points = P;
     MeanShape = triangulation(MeanShape.ConnectivityList,temp_MeanShape.Points);
 end
-
-inpdata = listdlg('ListString',fieldnames(DataOut),'Name','Please which data to analyze','ListSize',[500 250]);
 
 %% Selecting Viewing Perspective
 if select_perspective == 1

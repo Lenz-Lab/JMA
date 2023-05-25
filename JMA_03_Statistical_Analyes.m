@@ -117,7 +117,7 @@ data_2 = string(groups(comparison(2)));
 elseif stats_type == 3 % Group no stats
     %%
     [indx] = menu('Please select group(s)',groups);
-    groups = groups(indx);
+    data_1 = groups(indx);
 
 elseif stats_type == 4 % Individual no stats
     %%
@@ -129,22 +129,22 @@ elseif stats_type == 4 % Individual no stats
 
     norm_raw = menu('Would you like to see normalized or raw results?','Normalized','Raw');
 
-    data_1 = string(temp(indx));
-    for subj_count = 1:length(data_1)
-        S = dir(fullfile(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1(subj_count)),'*.mat'));
-        addpath(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1(subj_count)))
-        for c = 1:length(S)
-            temp = strsplit(S(c).name,'.');
-            temp = strrep(temp(1),' ','_');
-            temp = split(string(temp(1)),'_');
+    data_1 = string(subj_group.(string(groups)).SubjectList(indx));
+    for bone_count = 1:bone_amount
+        for subj_count = 1:length(data_1)
+            S = dir(fullfile(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1(subj_count)),'*.mat'));
+            addpath(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1(subj_count)))
+            for c = 1:length(S)
+                temp = strsplit(S(c).name,'.');
+                temp = strrep(temp(1),' ','_');
+                temp = split(string(temp(1)),'_');
             
-            for bone_count = 1:bone_amount
                 bone_names = Bone_Data{bone_count}.bone_names;
                 bone_check  = 0;
                 group_check = 0;    
                 for d = 1:length(temp)
                     bone_c  = strfind(lower(string(bone_names(1))),lower(string(temp(d))));
-                    group_c = strfind(lower(data_1),lower(string(temp(d))));
+                    group_c = strfind(lower(data_1(subj_count)),lower(string(temp(d))));
                     if isempty(bone_c) == 0
                         bone_check = 1;
                     end
@@ -152,7 +152,7 @@ elseif stats_type == 4 % Individual no stats
                         group_check = 1;
                     end
                     if bone_check == 1 && group_check == 1
-                        Bone_Ind.(string(data_1(subj_count))) = load(S(c).name);
+                        Bone_Ind{bone_count}.(string(data_1(subj_count))) = load(S(c).name);
                     end
                 end
             end
@@ -221,22 +221,22 @@ elseif stats_type == 4
     for subj_count = 1:length(data_1)
         for bone_count = 1:bone_amount
             bone_names                  = Bone_Data{bone_count}.bone_names;
-            MeanCP_Ind.(data_1(subj_count)){bone_count} = Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
-            MeanShape1                  = Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
+            MeanCP_Ind.(data_1(subj_count)){bone_count} = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
+            MeanShape1                  = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
         
             q = MeanCP_Ind.(data_1(subj_count)){bone_count}';
-            p = Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1))).Points;
+            p = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1))).Points;
             
             % Will need to flip the bone if it is a left in order to align
             % properly.
-            if isfield(Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))),'Side') == 1
-                if isequal(Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).Side,'Left')
+            if isfield(Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))),'Side') == 1
+                if isequal(Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).Side,'Left')
                     p = [-1*p(:,1) p(:,2) p(:,3)]';
                 end
-                if isequal(Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).Side,'Right')
+                if isequal(Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).Side,'Right')
                     p = [p(:,1) p(:,2) p(:,3)]';
                 end   
-            elseif isfield(Bone_Ind.(string(data_1(subj_count))).Data.(string(data_1(subj_count))),'Side') == 0
+            elseif isfield(Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))),'Side') == 0
                     p = [p(:,1) p(:,2) p(:,3)]';
             end
 
@@ -884,7 +884,99 @@ if stats_type < 3
 end
 
 %%
+clc
 if stats_type == 3
+    subj_group = Bone_Data{bone_count}.subj_group;
+    for plot_data = inpdata    
+            tif_folder = [];
+            N_length = [];
+            for n = 1:Bone_Data{1}.max_frames
+                %% Create directory to save .tif images
+                    tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
+                        ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
+                        string(plot_data_name(plot_data)),string(data_1(subj_count)));
+        
+        
+                if n == 1
+                    disp(tif_folder)
+                    fprintf('%s: \n',string(data_1(subj_count)))
+        
+                    % Create directory to save results
+                    mkdir(tif_folder);
+                end
+                %% Limits
+                ColorMap_Flip   = cell2mat(cmapflip(plot_data));
+                U               = cell2mat(upper_limit(plot_data));
+                L               = cell2mat(lower_limit(plot_data));
+
+                for bone_count = 1:bone_amount
+                    temp = [];
+                    temp_display = [];                    
+                    
+                    perc_stance = Bone_Data{1,1}.perc_stance;
+                    NodalIndex{bone_count}  = {};
+                    NodalData{bone_count}   = {};
+                    SPM_index{bone_count}   = [];
+                    k = 1;
+                    
+                    for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(data_1{1})(:,1))
+        
+                        data_cons1 = [];
+                        datd_cons1 = [];
+                        ss = 1;
+                        for s = 1:length(subj_group.(data_1{1}).SubjectList)
+                            if isempty(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1{1}).SubjectList(s))){m,n}) == 0
+                                data_cons1(ss) = Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1{1}).SubjectList(s))){m,n};
+                                datd_cons1(ss) = Bone_Data{bone_count}.DataOut.Distance.(string(subj_group.(data_1{1}).SubjectList(s))){m,n};
+                                ss = ss + 1;
+                            end
+                        end
+            
+                        if isempty(datd_cons1) == 0
+                            if mean(datd_cons1) <= Distance_Upper && mean(datd_cons1) >= Distance_Lower ...
+                                    && length(data_cons1) >= floor(length(subj_group.(data_1{1}).SubjectList)*(perc_part(1)/100))
+                                temp(k,:) = [m mean(data_cons1)];
+                                k = k + 1;
+                            end
+                        end
+                    end
+                    if isempty(temp) == 0
+                        NodalData{bone_count}   = temp(:,2);
+                        NodalIndex{bone_count}  = temp(:,1);
+                    end
+                end
+    
+                %% Create figure and save as .tif
+                CLimits = [L U];
+                vis_toggle = 0;
+                if isempty(NodalData{1}) == 0
+                    fprintf('%s\n',string(n))
+                    figure()    
+                    RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                        ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
+                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+        
+                    saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,data_1{1},n));
+                    N_length = [N_length n];
+                end
+            end
+        close all
+        clear NodalData NodalIndex
+        
+        if Bone_Data{1}.max_frames > 1
+            fprintf('Creating video...\n')
+            video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_%s.mp4',...
+                data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,comparison_name,string(plot_data_name(plot_data)),...
+                string(data_1(subj_count)))); % Create the video object.
+            video.FrameRate = frame_rate;
+            open(video); % Open the file for writing
+            for N = N_length
+                I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+                writeVideo(video,I); % Write the image to file.
+            end
+            close(video);
+        end
+    end                   
 end
 
 %%
@@ -899,7 +991,6 @@ if stats_type == 4
                         tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                             ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
                             string(plot_data_name(plot_data)),string(data_1(subj_count)));
-            
             
                     if n == 1
                         disp(tif_folder)
@@ -932,13 +1023,17 @@ if stats_type == 4
                                         k = k + 1;
                                     end
                                 end
+                                if isempty(temp) == 0
+                                    NodalData{bone_count}   = temp(:,2);
+                                    NodalIndex{bone_count}  = temp(:,1);
+                                end                                 
                             end
-                            if isempty(temp) == 0
-                                NodalData{bone_count}   = temp(:,2);
-                                NodalIndex{bone_count}  = temp(:,1);
-                            end
+
                         elseif norm_raw == 2
+                            NodalData{bone_count}   = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Data.(plot_data_name{plot_data});
+                            NodalIndex{bone_count}  = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Pair(:,1);
                         end
+                        SPM_index{bone_count} = find(NodalData{bone_count} >= 3);
                     end
         
                     %% Create figure and save as .tif

@@ -894,12 +894,12 @@ if stats_type == 3
                 %% Create directory to save .tif images
                     tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                         ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
-                        string(plot_data_name(plot_data)),string(data_1(subj_count)));
+                        string(plot_data_name(plot_data)),data_1{1});
         
         
                 if n == 1
                     disp(tif_folder)
-                    fprintf('%s: \n',string(data_1(subj_count)))
+                    fprintf('%s: \n',data_1{1})
         
                     % Create directory to save results
                     mkdir(tif_folder);
@@ -1033,7 +1033,6 @@ if stats_type == 4
                             NodalData{bone_count}   = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Data.(plot_data_name{plot_data});
                             NodalIndex{bone_count}  = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Pair(:,1);
                         end
-                        SPM_index{bone_count} = find(NodalData{bone_count} >= 3);
                     end
         
                     %% Create figure and save as .tif

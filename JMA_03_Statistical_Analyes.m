@@ -971,7 +971,7 @@ if stats_type == 3
             video.FrameRate = frame_rate;
             open(video); % Open the file for writing
             for N = N_length
-                I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+                I = imread(fullfile(tif_folder,sprintf('%s_%d.tif',data_1{1},N))); % Read the next image from disk.
                 writeVideo(video,I); % Write the image to file.
             end
             close(video);
@@ -1060,7 +1060,7 @@ if stats_type == 4
                 video.FrameRate = frame_rate;
                 open(video); % Open the file for writing
                 for N = N_length
-                    I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+                    I = imread(fullfile(tif_folder,sprintf('%s_%d.tif',string(data_1(subj_count)),N))); % Read the next image from disk.
                     writeVideo(video,I); % Write the image to file.
                 end
                 close(video);

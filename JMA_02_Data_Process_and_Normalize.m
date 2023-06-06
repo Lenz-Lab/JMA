@@ -43,8 +43,8 @@ fprintf('Loading Data:\n')
 for n = 1:str2double(study_num)
     D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
     
-    pulled_files = [];
     m = 1;
+    pulled_files = cell(length(D)-2,1);
     for k = 3:length(D)
         pulled_files{m} = D(k).name;
         m = m + 1;
@@ -56,18 +56,18 @@ for n = 1:str2double(study_num)
     %% Load Data for Each Subject
     for m = 1:length(pulled_files)
         %%
-        fprintf('   %s\n',string(pulled_files(m)))
-        addpath(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))))
+        fprintf('   %s\n',pulled_files{m})
+        addpath(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}))
         
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\',string(fldr_name{n}),string(pulled_files(m))),'*.mat'));
+        K = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.mat'));
         if isempty(K) == 0
             %%
             for c = 1:length(K)
                 temp = strsplit(K(c).name,'.');
                 temp = strrep(temp(1),' ','_');
-                temp = split(string(temp(1)),'_');
-                if isequal(temp(2),string(bone_names(1))) && isequal(temp(3),string(bone_names(2)))
+                temp = split(temp{1},'_');
+                if isequal(lower(temp{2}),lower(bone_names{1})) && isequal(lower(temp{3}),lower(bone_names{2}))
                     data = load(K(c).name);
                     g = fieldnames(data.Data);
                     Data.(string(g)) = data.Data.(string(g));
@@ -85,8 +85,8 @@ if troubleshoot_mode == 1
     close all
     for subj_count = 1:length(subjects)
         figure()
-        % B.faces        = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).ConnectivityList;
-        % B.vertices     = Data.(string(subjects(subj_count))).(string(bone_names(1))).(string(bone_names(1))).Points;
+        % B.faces        = Data.(subjects{subj_count}).(bone_names{1}).(bone_names{1}).ConnectivityList;
+        % B.vertices     = Data.(subjects{subj_count}).(bone_names{1}).(bone_names{1}).Points;
         % patch(B,'FaceColor', [0.85 0.85 0.85], ...
         % 'EdgeColor','none',...        
         % 'FaceLighting','gouraud',...
@@ -95,16 +95,16 @@ if troubleshoot_mode == 1
         % material('dull');
         % alpha(0.5);
         % hold on
-        CP_points = Data.(string(subjects(subj_count))).(string(bone_names(1))).CP;
+        CP_points = Data.(subjects{subj_count}).(bone_names{1}).CP;
         plot3(CP_points(:,1),CP_points(:,2),CP_points(:,3),'.k')
         hold on
-        CP = Data.(string(subjects(subj_count))).MeasureData.F_1.Pair(:,1);
+        CP = Data.(subjects{subj_count}).MeasureData.F_1.Pair(:,1);
         plot3(CP_points(CP,1),CP_points(CP,2),CP_points(CP,3),'ob','linewidth',2)
         % set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]); %[-0.0036 0.0306 0.5073 0.9694]
         axis equal
         set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
         camlight(0,0)
-        title(strrep(string(subjects(subj_count)),'_',' '))
+        title(strrep(subjects{subj_count},'_',' '))
     end
     uiwait(msgbox({'Please check and make sure that their are correspondence particles cirlced in blue in the correct joint of interest (only one time step!)','','       Do not select OK until you are ready to move on!'}))
     q = questdlg({'Are there particles circled in blue in the correct joint/area?','Yes to continue troubleshooting (will proceed)','No to abort script (will stop)','Cancel to stop troubleshooting (will proceed)'});
@@ -121,27 +121,27 @@ end
 %% %%%%%%%%%%%%%%%%%%%%%%%%%% Data Analysis %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Data Analysis:\n')
 g = fieldnames(Data);
-MeanCP = length(Data.(string(g(1))).(string(bone_names(1))).CP(:,1));
+MeanCP = length(Data.(g{1}).(bone_names{1}).CP(:,1));
 
 %% Normalize Data
 for subj_count = 1:length(subjects)
-    if isfield(Data.(string(subjects(subj_count))),'Event') == 1
-        frames = Data.(string(subjects(subj_count))).Event;
-    elseif isfield(Data.(string(subjects(subj_count))),'Event') == 0
+    if isfield(Data.(subjects{subj_count}),'Event') == 1
+        frames = Data.(subjects{subj_count}).Event;
+    elseif isfield(Data.(subjects{subj_count}),'Event') == 0
         frames = [1 1 1 1];
-        if length(fieldnames(Data.(string(subjects(subj_count))).MeasureData)) > 1
-            frames = [1 1 length(fieldnames(Data.(string(subjects(subj_count))).MeasureData)) length(fieldnames(Data.(string(subjects(subj_count))).MeasureData))];
+        if length(fieldnames(Data.(subjects{subj_count}).MeasureData)) > 1
+            frames = [1 1 length(fieldnames(Data.(subjects{subj_count}).MeasureData)) length(fieldnames(Data.(subjects{subj_count}).MeasureData))];
         end
     end
     
     k = 1;
     if frames(:,4) > frames(:,1)
         for m = frames(:,1):frames(:,4)
-            Frames.(string(subjects(subj_count)))(k,1) = {100*(m - frames(:,2))/(frames(:,3) - frames(:,2))};
+            Frames.(subjects{subj_count})(k,1) = {100*(m - frames(:,2))/(frames(:,3) - frames(:,2))};
             k = k + 1;
         end
     else
-        Frames.(string(subjects(subj_count)))(k,1) = {1};
+        Frames.(subjects{subj_count})(k,1) = {1};
     end
     clear frames
 end
@@ -151,8 +151,8 @@ temp_min = zeros(1,length(subjects));
 temp_max = zeros(1,length(subjects));
 
 for subj_count = 1:length(subjects)
-    temp_min(:,subj_count) = min(min(cell2mat(Frames.(string(subjects(subj_count)))(:,1))));
-    temp_max(:,subj_count) = max(max(cell2mat(Frames.(string(subjects(subj_count)))(:,1))));
+    temp_min(:,subj_count) = min(min(cell2mat(Frames.(subjects{subj_count})(:,1))));
+    temp_max(:,subj_count) = max(max(cell2mat(Frames.(subjects{subj_count})(:,1))));
 end
 
 % identifies minimum and maximum to truncate to
@@ -164,10 +164,10 @@ ind = cell(1,length(subjects));
 temp_length = zeros(1,length(subjects));
 for subj_count = 1:length(subjects)
     % Find indices between the minimum and maximum values
-    ind(:,subj_count) = {find(cell2mat(Frames.(string(subjects(subj_count)))(:,1)) >= max(temp_min) & cell2mat(Frames.(string(subjects(subj_count)))(:,1)) <= min(temp_max))};
+    ind(:,subj_count) = {find(cell2mat(Frames.(subjects{subj_count})(:,1)) >= max(temp_min) & cell2mat(Frames.(subjects{subj_count})(:,1)) <= min(temp_max))};
     % Pull data from previously found indices
-    data.(string(subjects(subj_count))).Frame(:,1) = cell2mat(ind(:,subj_count));
-    data.(string(subjects(subj_count))).Frame(:,2) = cell2mat(Frames.(string(subjects(subj_count)))(cell2mat(ind(:,subj_count)),1));
+    data.(subjects{subj_count}).Frame(:,1) = cell2mat(ind(:,subj_count));
+    data.(subjects{subj_count}).Frame(:,2) = cell2mat(Frames.(subjects{subj_count})(cell2mat(ind(:,subj_count)),1));
     % [(frame #) (normalized stance)]
     
     % Initialize variable for interpolation
@@ -178,17 +178,14 @@ max_frames = max(temp_length);
 
 %% Move Data structure to data structure for data manipulation
 for n = 1:length(subjects)
-    for m = 1:length(data.(string(subjects(n))).Frame(:,1))
+    f = fieldnames(Data.(subjects{n}).MeasureData);
+    for m = 1:length(f)        
         % Correspondence Particle Index
-        data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,1) = Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Pair(:,1);
-        g = fieldnames(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data);
+        data.(subjects{n}).CP.(f{m})(:,1) = Data.(subjects{n}).MeasureData.(f{m}).Pair(:,1);
+        g = fieldnames(Data.(subjects{n}).MeasureData.(f{m}).Data);
         for k = 1:length(g)
-            % Joint Space Measurement Data
-            % if k > 1
-            %     data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,k+1) = NaN(length(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(1)))(:,1)),1);
-            % end
-            for p = 1:length(Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(k)))(:,1))
-                data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(p,k+1) = Data.(string(subjects(n))).MeasureData.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1))).Data.(string(g(k)))(p,1);
+            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1))
+                data.(subjects{n}).CP.(f{m})(p,k+1) = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
             end           
         end
     end
@@ -196,24 +193,24 @@ end
 
 %% Interpolate Individual Data Across Population to Match Length
 fprintf('Interpolating Data\n')
-clear temp
 for n = 1:length(subjects)
-    fprintf('    %s\n',string(subjects(n)))
-
-    if length(data.(string(subjects(n))).Frame(:,1)) > 1
-        IntData.(string(subjects(n))).Frame(:,1) = interp1((1:numel(data.(string(subjects(n))).Frame(:,2))),data.(string(subjects(n))).Frame(:,2),linspace(1,numel(data.(string(subjects(n))).Frame(:,2)), numel(1:max_frames)), 'linear')';
+    fprintf('    %s\n',subjects{n})
+    f = fieldnames(Data.(subjects{n}).MeasureData);
+    if length(data.(subjects{n}).Frame(:,1)) > 1
+        IntData.(subjects{n}).Frame(:,1) = interp1((1:numel(data.(subjects{n}).Frame(:,2))),data.(subjects{n}).Frame(:,2),linspace(1,numel(data.(subjects{n}).Frame(:,2)), numel(1:max_frames)), 'linear')';
     else
-        IntData.(string(subjects(n))).Frame(:,1) = 1;
+        IntData.(subjects{n}).Frame(:,1) = 1;
     end    
         
     for CItoDist = 1:length(g)
-        for m = 1:length(data.(string(subjects(n))).Frame(:,1))
-	        temp(:,m) = {[data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,1) data.(string(subjects(n))).CP.(sprintf('F_%d',data.(string(subjects(n))).Frame(m,1)))(:,CItoDist+1)]};
+        temp = cell(1,length(data.(subjects{n}).Frame(:,1)));
+        for m = 1:length(data.(subjects{n}).Frame(:,1))
+	        temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
         end
         
-        cp = cell(MeanCP,length(data.(string(subjects(n))).Frame(:,1)));
+        cp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));
         
-        for m = 1:length(data.(string(subjects(n))).Frame(:,1))
+        for m = 1:length(data.(subjects{n}).Frame(:,1))
             a = temp{1,m};
             for aa = 1:length(a(:,1))
                 cp(a(aa,1),m) = {a(aa,2)};
@@ -226,13 +223,13 @@ for n = 1:length(subjects)
     % entire trial
     % WARNING: This section of code is a hot mess!
         
-        int_temp = cell(MeanCP,length(data.(string(subjects(n))).Frame(:,1)));          
+        int_temp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));          
         
-        if length(IntData.(string(subjects(n))).Frame(:,1)) == 1    
-            for inter_v = 1:length(data.(string(subjects(n))).CP.F_1)
-                int_temp(data.(string(subjects(n))).CP.F_1(inter_v,1),:) = {data.(string(subjects(n))).CP.F_1(inter_v,CItoDist+1)};
+        if length(IntData.(subjects{n}).Frame(:,1)) == 1    
+            for inter_v = 1:length(data.(subjects{n}).CP.F_1)
+                int_temp(data.(subjects{n}).CP.F_1(inter_v,1),:) = {data.(subjects{n}).CP.F_1(inter_v,CItoDist+1)};
             end        
-            DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;
+            DataOut.(g{CItoDist}).(subjects{n}) = int_temp;
         else
             % Split into clusters and interpolate across the entire
             % activity. The issue being if there are particles that have
@@ -268,20 +265,20 @@ for n = 1:length(subjects)
                     end
                 end   
         
-                perc_temp = IntData.(string(subjects(n))).Frame(:,1);
+                perc_temp = IntData.(subjects{n}).Frame(:,1);
         
                 if isempty(c_end) == 0
                     c = find(c_end(:,1) == c_start(:,1));
                     if isempty(c) == 1
                         for bu = 1:length(c_start)
-                        perc_start = 100*(c_start(bu,:)/length(data.(string(subjects(n))).Frame(:,1)));
-                        perc_end = 100*(c_end(bu,:)/length(data.(string(subjects(n))).Frame(:,1)));
+                        perc_start = 100*(c_start(bu,:)/length(data.(subjects{n}).Frame(:,1)));
+                        perc_end = 100*(c_end(bu,:)/length(data.(subjects{n}).Frame(:,1)));
         
                         A = repmat(perc_start,[1 length(perc_temp)]);
-                        [minValue,closest_start] = min(abs(A-perc_temp'));
+                        [~,closest_start] = min(abs(A-perc_temp'));
         
                         A = repmat(perc_end,[1 length(perc_temp)]);
-                        [minValue,closest_end] = min(abs(A-perc_temp'));
+                        [~,closest_end] = min(abs(A-perc_temp'));
         
                         x = cell2mat(cp(h,(c_start(bu):c_end(bu))));
         
@@ -296,7 +293,7 @@ for n = 1:length(subjects)
                 end
             clear c_temp c_start
             end
-            DataOut.(string(g(CItoDist))).(string(subjects(n))) = int_temp;    
+            DataOut.(g{CItoDist}).(subjects{n}) = int_temp;    
             clear int_temp
         end    
     end
@@ -310,9 +307,9 @@ fprintf('Mean Congruence Index and Distance \n')
 
 g = fieldnames(subj_group);
 for study_pop = 1:length(g)
-    subjects = subj_group.(string(g(study_pop))).SubjectList;
+    subjects = subj_group.(g{study_pop}).SubjectList;
     
-    fprintf('    %s\n',string(g(study_pop)))
+    fprintf('    %s\n',g{study_pop})
     %%
     gg = fieldnames(DataOut);
     for CItoDist = 1:length(gg)
@@ -320,12 +317,12 @@ for study_pop = 1:length(g)
             for m = 1:max_frames
                 temp = [];        
                 for s = 1:length(subjects)
-                    t = DataOut.(string(gg(CItoDist))).(string(subjects(s)))(n,m);
+                    t = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
                     if isempty(cell2mat(t)) == 0
                         temp(s,:) = cell2mat(t);
                     end
                 end
-                DataOut_Mean.(string(gg(CItoDist))).(string(g(study_pop)))(n,m) = 0;
+                DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = 0;
                 
                 if isempty(temp) == 0 
                     if length(temp) >= 2
@@ -334,10 +331,10 @@ for study_pop = 1:length(g)
                             temp(y) = [];
                         end
                         % temp(find(isnan(temp))) = [];
-                        DataOut_Mean.(string(gg(CItoDist))).(string(g(study_pop)))(n,m) = mean(temp);
-                        DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {[]};
+                        DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = mean(temp);
+                        DataOut_SPM.(gg{CItoDist}).(g{study_pop}){n,m} = {[]};
                         if length(temp) == floor(length(subjects)) % How many articulating CP in order to be included
-                            DataOut_SPM.(string(gg(CItoDist))).(string(g(study_pop))){n,m} = {temp};
+                            DataOut_SPM.(gg{CItoDist}).(g{study_pop}){n,m} = {temp};
                         end
                     end
                 end
@@ -359,19 +356,19 @@ for study_pop = 1:length(g)
     for n = 1:MeanCP
         for m = 1:max_frames
             k = 1;
-            gg = subj_group.(string(g(study_pop))).SubjectList;
+            gg = subj_group.(g{study_pop}).SubjectList;
             gg_find = [];
             for subj_count = 1:length(gg)
-                temp = cell2mat(DataOut.(string(gg_check)).(string(gg(subj_count)))(n,m));
+                temp = cell2mat(DataOut.(string(gg_check)).(gg{subj_count})(n,m));
                 if isempty(temp) == 0
                     gg_find(k,:) = temp;
                     k = k + 1;
                     clear temp
                 end
             end
-            SPM_check_list.(string(g(study_pop))){n,m} = 0;
+            SPM_check_list.(g{study_pop}){n,m} = 0;
             if length(gg_find) == length(gg)
-                SPM_check_list.(string(g(study_pop))){n,m} = 1;
+                SPM_check_list.(g{study_pop}){n,m} = 1;
             end
         end
     end
@@ -382,17 +379,17 @@ fprintf('Consolidating Data\n')
 g = fieldnames(subj_group);
 gg = fieldnames(DataOut);
 for study_pop = 1:length(g)
-subjects = subj_group.(string(g(study_pop))).SubjectList;
+subjects = subj_group.(g{study_pop}).SubjectList;
 
     for CItoDist = 1:length(gg)
         k = 1;
         for n = 1:MeanCP
             for m = 1:max_frames
                 for s = 1:length(subjects)
-                    temp = DataOut.(string(gg(CItoDist))).(string(subjects(s)))(n,m);
+                    temp = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
                     if isempty(cell2mat(temp)) == 0
                         if cell2mat(temp) > 0
-                            DataOutAll.(string(gg(CItoDist)))(k,:) = cell2mat(temp);
+                            DataOutAll.(gg{CItoDist})(k,:) = cell2mat(temp);
                             k = k + 1;
                         end
                     end
@@ -403,41 +400,42 @@ subjects = subj_group.(string(g(study_pop))).SubjectList;
 end
 
 %% Save Coverage Areas to Spreadsheet
+templength = zeros(1,length(g));
 g = fieldnames(Data);
 for g_count = 1:length(g)
-    gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
+    gg = fieldnames(Data.(g{g_count}).CoverageArea);
     templength(g_count) = length(gg);  
 end
 
 surf_area = cell(max(templength)+2,g_count);
 g = fieldnames(Data);
-if length(Data.(string(g(g_count))).CoverageArea.F_1) == 1
+if length(Data.(g{g_count}).CoverageArea.F_1) == 1
     for g_count = 1:length(g)
-        gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
-        surf_area{1,g_count} = string(g(g_count));
-        surf_area{2,g_count} = string(bone_names(1));
+        gg = fieldnames(Data.(g{g_count}).CoverageArea);
+        surf_area{1,g_count} = g{g_count};
+        surf_area{2,g_count} = bone_names{1};
         for frame_count = 1:length(gg)
-            if iscell(Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
-                surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+            if iscell(Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
+                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
             else 
-                surf_area{frame_count+2,g_count}                = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
+                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
             end
         end
     end
-elseif length(Data.(string(g(g_count))).CoverageArea.F_1) == 2
+elseif length(Data.(g{g_count}).CoverageArea.F_1) == 2
     g_spacer = 1:2:2*length(g);
     for g_count = 1:length(g)
-        gg = fieldnames(Data.(string(g(g_count))).CoverageArea);
-        surf_area{1,g_spacer(g_count)} = string(g(g_count));
-        surf_area{2,g_spacer(g_count)} = string(bone_names(1));
-        surf_area{2,g_spacer(g_count)+1} = string(bone_names(2));
+        gg = fieldnames(Data.(g{g_count}).CoverageArea);
+        surf_area{1,g_spacer(g_count)} = g{g_count};
+        surf_area{2,g_spacer(g_count)} = bone_names{1};
+        surf_area{2,g_spacer(g_count)+1} = bone_names{2};
         for frame_count = 1:length(gg)
-            if iscell(Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
-                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
-                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
+            if iscell(Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
             else
-                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
-                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(string(g(g_count))).CoverageArea.(sprintf('F_%d',frame_count))(:,2);
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,2);
             end
         end
     end
@@ -453,7 +451,7 @@ end
 
 addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir))
 
-perc_temp           = IntData.(string(subjects(1))).Frame(:,1);
+perc_temp           = IntData.(subjects{1}).Frame(:,1);
 
 % Rows are correspondence particle indices
 % Columns are percentages of the normalized activity
@@ -476,7 +474,7 @@ for n = 1:length(g)
     temp_name = strcat(temp_name,temp_n);
 end
 
-writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',string(bone_names(1)),string(bone_names(2)),temp_name)));
+writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',bone_names{1},bone_names{2},temp_name)));
 
-save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Normalized_Data_%s_%s%s.mat',string(bone_names(1)),string(bone_names(2)),temp_name)),'-struct','A');
+save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Normalized_Data_%s_%s%s.mat',bone_names{1},bone_names{2},temp_name)),'-struct','A');
 fprintf('Complete!\n')

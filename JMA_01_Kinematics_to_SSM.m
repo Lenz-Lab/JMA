@@ -241,7 +241,21 @@ for n = 1:str2double(study_num)
     clear pulled_files
 end
 
-subjects =subjects(~cellfun('isempty',subjects));
+subjects = subjects(~cellfun('isempty',subjects));
+
+%% Waitbar Preloading
+% waitbar calculations
+g = fieldnames(Data);
+
+waitbar_length = 0;
+for n = 1:length(g)
+    waitbar_length = waitbar_length + length(Data.(g{n}).(bone_names{1}).Kinematics(:,1));
+end
+% Add ICP alignment to CP
+waitbar_length = waitbar_length + (12*length(g));
+waitbar_count = 1;
+
+W = waitbar(waitbar_count/waitbar_length,'Identifying bone indices to correspondence particles...');
 
 %% Identify Indices on Bones from SSM Local Particles
 fprintf('Local Particles -> Bone Indices\n')
@@ -304,6 +318,10 @@ for subj_count = 1:length(g)
     
                     ER_temp(icp_count+1)   = min(ER);
                     ICP{icp_count+1}.P     = P;
+
+                    % waitbar update
+                    W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
+                    waitbar_count = waitbar_count + 1;                    
                 end
 
                 %%
@@ -324,6 +342,7 @@ for subj_count = 1:length(g)
 
                 found_dist = pdist2(single(CP(r,:)),single(P(ROI,:)));
                 min_dist = ROI(found_dist == min(found_dist));
+                % dist_i = find(found_dist == min(found_dist));
                 if isempty(min_dist) == 0
                     i_pair(r,:) = [r min_dist(1)];
                 end
@@ -427,6 +446,9 @@ end
 fprintf('Bone Transformations via Kinematics:\n')
 groups = fieldnames(subj_group);
 
+% waitbar update
+W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+
 for group_count = 1:length(groups)
     subjects = subj_group.(groups{group_count}).SubjectList;
     for subj_count = 1:length(subjects) 
@@ -459,7 +481,7 @@ for group_count = 1:length(groups)
         
         %%
         for frame_count = frame_start:length(kine_data_length(:,1))
-            tic
+            % tic
             %%
             fprintf('      %d\n',frame_count)
             clear temp i_pair temp_STL
@@ -928,10 +950,14 @@ for group_count = 1:length(groups)
                 clear SaveData
             end
             
-            toc
+            % toc
             
             w = warning('query','last');
             warning('off',w.identifier);
+
+            % waitbar update
+            W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+            waitbar_count = waitbar_count + 1;             
     
         end
         

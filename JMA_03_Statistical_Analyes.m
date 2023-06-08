@@ -77,9 +77,10 @@ fprintf('Selecting Groups...\n')
 subj_group = Bone_Data{1}.subj_group;
 g = fieldnames(subj_group);
 groups = fieldnames(subj_group);
-if stats_type <= 2
-    %%
 t1 = 'Please select groups';
+
+if isequal(stats_type,1)
+    %%
     t2 = 'If two are selected (t-test or Wilcoxon rank sum)';
     t3 = 'If more than two (one-way ANOVA or Kruskal-Wallis)';
     ma = 75;
@@ -89,6 +90,10 @@ elseif isequal(stats_type,2)
     t2 = 'Only select two for SPM';
     ma = 2*max([length(t1), length(t2)]);
     uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2])}))
+end
+
+%%
+if stats_type <= 2
 [indx,tf] = listdlg('ListString',string(g),'Name','Please select groups','ListSize',[500 500]);
 
 if length(indx) < 2
@@ -394,7 +399,7 @@ if select_perspective == 1
             
             colormap_choice = string(formats(5,1).items(set_inp.CMap));
             if isequal(set_inp.CMap,length(formats(5,1).items))
-                colormap_choice_new = string(inputdlg({'Type in colormap name:'},'Colormap',[1 30],{char(string('jet'))}));
+                colormap_choice_new = string(inputdlg({'Type in colormap name:'},'Colormap',[1 30],{char('jet')}));
                 colormap_choice = colormap_choice_new;
             end            
             
@@ -450,7 +455,7 @@ for n = [inpdata inpdata(end)+1]
         formats(k,1).type                       = 'edit';
         formats(k,1).size                       = [200-length(char(string(listdata{1,n}))) 20]; 
         k = k + 1;
-        Prompt(end+1,:)                             = {'Flip colormap?',sprintf('A%d',k),[]};
+        Prompt(end+1,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
         formats(k,2).type                       = 'check';
         if isequal(lower(string(g(n))),'distance')
             DefAns.(sprintf('A%d',k))           = true;
@@ -504,13 +509,12 @@ if isequal(stats_type,1)
     
     %% Data ANOVA or t-Tests
     for bone_count = 1:bone_amount
-        Bone_Data{bone_count}.bone_names(1)
-        fprintf('Processing Bone %s\n',string(Bone_Data{bone_count}.bone_names(1)))
+        fprintf('Processing Bone: %s\n',string(Bone_Data{bone_count}.bone_names(1)))
         fs = 1;
         for g_count = inpdata
-            not_normal.(string(g(g_count))) = 1;
-            NewBoneData{bone_count}.Results.(string(g(g_count))) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
-            NewBoneData{bone_count}.Data_All.(string(g(g_count))) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
+            not_normal.(g{g_count}) = 1;
+            NewBoneData{bone_count}.Results.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
+            NewBoneData{bone_count}.Data_All.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
             for n = 1:min(max_cp{bone_count})
                 for m = 1:Bone_Data{bone_count}.max_frames
                     clear statdata
@@ -520,7 +524,7 @@ if isequal(stats_type,1)
                     for group_count = 1:length(groups)
                         temp = [];
                         for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)
-                            temp = [temp Bone_Data{bone_count}.DataOut.(string(g(g_count))).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                            temp = [temp Bone_Data{bone_count}.DataOut.(g{g_count}).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
                         end
                         temp(find(isnan(temp))) = [];
                         statdata.(string(groups(group_count))) = temp;
@@ -542,23 +546,23 @@ if isequal(stats_type,1)
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                             if n == 1 && m == 1
                                 fprintf('Mann-Whitney t-Test or Wilcoxon Rank Sum Test\n')
-                                test_type = 1;
                             end
+                            test_type = 1;
                             [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
                             % mann-whitney t-test
                             % Wilcoxon rank sum test
                             [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
                             
                             if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
-                                NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
                             end
                         elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
                             if isempty(data_all) == 0 && isempty(agrp_id) == 0
                                 if n == 1 && m == 1
-                                    fprintf('One-way ANOVA or Kruskal-Wallis\n')
-                                    test_type = 2;
+                                    fprintf('One-way ANOVA or Kruskal-Wallis\n')   
                                 end
+                                test_type = 2;
                                 clear p_parametric p_nonparametric
                                 [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
                                 [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
@@ -577,9 +581,9 @@ if isequal(stats_type,1)
                                     p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
                                 end
                             
-                                NewBoneData{bone_count}.Results.(string(g(g_count))){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
                                 if norm_test(8,3) == 0
-                                    not_normal.(string(g(g_count))) = 0;
+                                    not_normal.(g{g_count}) = 0;
                                 end
                             end
                         end 
@@ -590,7 +594,8 @@ if isequal(stats_type,1)
     end
     
     %% Report Normality
-    for n = inpdata
+    g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
+    for n = 1:length(inpdata)
         if not_normal.(string(g(inpdata(n)))) == 0
             fprintf('Normality Test %s: Nonparametric\n',string(g(inpdata(n))))
             normal_flag = 0;
@@ -612,26 +617,26 @@ if isequal(stats_type,2)
     gg = fieldnames(Bone_Data{1}.DataOut_SPM.(string(g(1))));
     for g_count = inpdata
         for bone_count = 1:bone_amount
-            fprintf('Processing Bone %s\n',string(Bone_Data{bone_count}.bone_names(1)))
-            reg_sig.(string(g(g_count))){bone_count} = {};
-            for n = 1:min([length(Bone_Data{bone_count}.DataOut_SPM.(string(g(g_count))).(string(data_1))) length(Bone_Data{bone_count}.DataOut_SPM.(string(g(g_count))).(string(data_2)))])
+            fprintf('Processing Bone: %s\n',string(Bone_Data{bone_count}.bone_names(1)))
+            reg_sig.(g{g_count}){bone_count} = {};
+            for n = 1:min([length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1))) length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_2)))])
                 clear section1 section2 pperc_stance
                 % Separate data
                 data1 = [];
                 data2 = [];
+              
                 for m = 1:Bone_Data{bone_count}.max_frames
-                    if isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_1)){n,m},1) && isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_2)){n,m},1) && isempty(Bone_Data{bone_count}.DataOut_SPM.(string(g(g_count))).(string(data_1)){n,m}) == 0
-                        data1(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(g(g_count))).(string(data_1)){n,m});
-                        data2(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(g(g_count))).(string(data_2)){n,m});
+                    if isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_1)){n,m},1) && isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_2)){n,m},1) && isempty(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1)){n,m})) == 0
+                        data1(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1)){n,m});
+                        data2(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_2)){n,m});
                     end
                 end
-        
+                % 
                 % Find regions of statistical significance for each particle.
                 % Note that the figures are suppressed!
                 k = 1;
                 if isempty(data1) == 0
                     if length(data1(1,:)) > 1
-        
         
                         temp1 = find(data1(1,:) == 0);
                         temp2 = find(data1(2,:) == 0);
@@ -647,21 +652,22 @@ if isequal(stats_type,2)
                                 pperc_stance{k1}    = Bone_Data{bone_count}.perc_stance(ix0(k1):ix1(k1),:); 
                             end
         
-                            reg_sig.(string(g(g_count))){bone_count}(n,:) = {[]};
+                            reg_sig.(g{g_count}){bone_count}(n,:) = {[]};
                             ss = 1;
                             for s = 1:length(section1)
                                 if length(section1{s}(1,:)) > 1
-                                    sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),1,string(g(g_count)),[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
+                                    sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),1,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
                                     if isempty(sig_stance) == 0
-                                        reg_sig.(string(g(g_count))){bone_count}(n,:) = {[cell2mat(reg_sig.(string(g(g_count))){bone_count}(n,:)); sig_stance]};
+                                        reg_sig.(g{g_count}){bone_count}(n,:) = {[cell2mat(reg_sig.(g{g_count}){bone_count}(n,:)); sig_stance]};
                                     end
                                     ss = ss + 1;
                                 end
                             end                   
                         else
-                            sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),1,string(g(g_count)),[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
+                            perc_stance = Bone_Data{bone_count}.perc_stance;
+                            sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),1,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
                             if isempty(sig_stance) == 0
-                                reg_sig.(string(g(g_count))){bone_count}(n,:) = {sig_stance};
+                                reg_sig.(g{g_count}){bone_count}(n,:) = {sig_stance};
                                 clear data1 data2
                             end                    
                         end
@@ -672,13 +678,8 @@ if isequal(stats_type,2)
     end
 end
 
-%% Group Results (no stats)
-if isequal(stats_type,3)
-    reg_sig = [];
-end
-
-%% Individual Results (no stats)
-if isequal(stats_type,4)
+%% Group Results (no stats) or Individual Results (no stats)
+if isequal(stats_type,3) || isequal(stats_type,4)
     reg_sig = [];
 end
 
@@ -724,8 +725,15 @@ elseif bone_amount > 1
     bone_comparison_name = strcat(bone_comparison_name,sprintf('combined_%s',string(bone_names{2})));
 end
 
-if isequal(additional_name,'') == 0
-    strcat(additional_name,strcat('_',bone_comparison_name))
+if ~isequal(additional_name,'')
+    bone_comparison_name= strcat(additional_name,strcat('_',bone_comparison_name));
+    if exist('normal_flag','var') == 1
+        if isequal(normal_flag,1)
+            bone_comparison_name = strcat(bone_comparison_name,'_Parametric');
+        elseif ~isequal(normal_flag,1)
+            bone_comparison_name = strcat(bone_comparison_name,'_NonParametric');       
+        end
+    end
 end
 
 if stats_type < 3
@@ -752,10 +760,12 @@ if stats_type < 3
             for bone_count = 1:bone_amount
                 temp = [];
                 temp_display = [];
-
                 
                 %% ANOVA and t-Test
                 if isequal(stats_type,1)
+                    NodalIndex{bone_count}  = [];
+                    NodalData{bone_count}   = [];
+                    SPM_index{bone_count} = [];
                     k = 1;
                     f = 1;
                     for m = 1:length(NewBoneData{bone_count}.Results.(string(g(plot_data)))(:,1))
@@ -819,19 +829,19 @@ if stats_type < 3
                     NodalIndex{bone_count}  = [];
                     NodalData{bone_count}   = [];
                     for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(:,1))
-                        if Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) > 0 && Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n) <= Distance_Upper && Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_2))(m,n) <= Distance_Upper
+                        if Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) > Distance_Lower && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) <= Distance_Upper && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_2))(m,n) <= Distance_Upper
                             NodalIndex{bone_count}(k,:) = m;
                             NodalData{bone_count}(k,:)  = Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n);
                             k = k + 1;
                         end
                     end
-                    % 
+
                     if isfield(reg_sig,string(g(plot_data))) == 1
                         reg_sigg = reg_sig.(string(g(plot_data))){bone_count};
                     else
                         reg_sigg = [];
                     end
-            
+
                     %%
                         SPM_index{bone_count} = [];
                         tt = [];
@@ -854,7 +864,7 @@ if stats_type < 3
             CLimits = [L U];
             vis_toggle = 0;
             if isempty(NodalData{1}) == 0
-                fprintf('%s\n',string(n))
+                fprintf('%d\n',n)
                 figure()    
                 RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                     ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
@@ -1068,3 +1078,5 @@ if stats_type == 4
         end                
     end
 end
+
+fprintf('Complete!\n')

@@ -59,7 +59,7 @@ for n = 1:str2double(study_num)
         fprintf('   %s\n',pulled_files{m})
         addpath(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}))
         
-        %% Load the Individual Bone Kinematics from .txt
+        %% Load
         K = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.mat'));
         if isempty(K) == 0
             %%
@@ -124,6 +124,7 @@ g = fieldnames(Data);
 MeanCP = length(Data.(g{1}).(bone_names{1}).CP(:,1));
 
 %% Normalize Data
+fprintf('Normalizing data...\n')
 for subj_count = 1:length(subjects)
     if isfield(Data.(subjects{subj_count}),'Event') == 1
         frames = Data.(subjects{subj_count}).Event;
@@ -185,14 +186,29 @@ for n = 1:length(subjects)
         g = fieldnames(Data.(subjects{n}).MeasureData.(f{m}).Data);
         for k = 1:length(g)
             for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1))
-                data.(subjects{n}).CP.(f{m})(p,k+1) = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
+                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
+                nan_temp(isnan(nan_temp)) = 0;
+                data.(subjects{n}).CP.(f{m})(p,k+1) = nan_temp;
             end           
         end
     end
 end
 
+%% Waitbar Preloading - Interpolating
+% waitbar calculations
+g = fieldnames(Data);
+c = fieldnames(Data.(subjects{1}).MeasureData.(f{1}).Data);
+
+waitbar_length = (length(g))*length(c);
+
+waitbar_count = 1;
+
+W = waitbar(waitbar_count/waitbar_length,'Interpolating Data...');
+
 %% Interpolate Individual Data Across Population to Match Length
 fprintf('Interpolating Data\n')
+g = fieldnames(Data.(subjects{1}).MeasureData.(f{1}).Data);
+
 for n = 1:length(subjects)
     fprintf('    %s\n',subjects{n})
     f = fieldnames(Data.(subjects{n}).MeasureData);
@@ -295,15 +311,21 @@ for n = 1:length(subjects)
             end
             DataOut.(g{CItoDist}).(subjects{n}) = int_temp;    
             clear int_temp
-        end    
+        end   
+
+    % waitbar update
+    W = waitbar(waitbar_count/waitbar_length,W,'Interpolating Data...');
+    waitbar_count = waitbar_count + 1;
+    
     end
 end
-clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode
 
 %%
+close all
+clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode
 
 %% Calculate Mean Congruence and Distance at Each Common Correspondence Particle
-fprintf('Mean Congruence Index and Distance \n')
+fprintf('Calculating Mean Data... \n')
 
 g = fieldnames(subj_group);
 for study_pop = 1:length(g)
@@ -327,10 +349,10 @@ for study_pop = 1:length(g)
                 if isempty(temp) == 0 
                     if length(temp) >= 2
                         y = find(temp == 0);
-                        if isempty(y) == 0
+                        if isempty(y) == 0 && CItoDist <= 2
                             temp(y) = [];
                         end
-                        % temp(find(isnan(temp))) = [];
+                        temp(find(isnan(temp))) = [];
                         DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = mean(temp);
                         DataOut_SPM.(gg{CItoDist}).(g{study_pop}){n,m} = {[]};
                         if length(temp) == floor(length(subjects)) % How many articulating CP in order to be included
@@ -349,6 +371,7 @@ end
 % SPM needs to have data for each person at a particle for it to be
 % compared. So SPM_check_list will have a 1 at that particle at that frame
 % if it does.
+fprintf('Verifying length for SPM analysis...\n')
 gg = fieldnames(DataOut);
 gg_check = gg(1);
 g = fieldnames(subj_group);
@@ -375,7 +398,7 @@ for study_pop = 1:length(g)
 end
 
 %% Calculate Overall Mean and STD From All Data
-fprintf('Consolidating Data\n')
+fprintf('Consolidating Data...\n')
 g = fieldnames(subj_group);
 gg = fieldnames(DataOut);
 for study_pop = 1:length(g)

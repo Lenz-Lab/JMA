@@ -98,7 +98,7 @@ for n = 1:str2double(study_num)
 end
 
 delete(gcp('nocreate'))
-pool = parpool([1 100]);
+pool = parpool([1 12]);
 clc
 
 %% Loading Data
@@ -325,7 +325,8 @@ for subj_count = 1:length(g)
                 end
 
                 %%
-                P = ICP{ER_temp == min(ER_temp)}.P;
+                ER_temp_s = find((ER_temp == min(ER_temp)) == 1);
+                P = ICP{ER_temp_s(1)}.P;
                 ICP_group{subj_count}.P     = P;
                 ICP_group{subj_count}.CP    = CP;
                 clear ER_temp ICP

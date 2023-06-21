@@ -259,18 +259,13 @@ elseif stats_type == 4
         %             Jakob Wilm (2022). Iterative Closest Point (https://www.mathworks.com/matlabcentral/fileexchange/27804-iterative-closest-point), MATLAB Central File Exchange.
                 [R,T,ER] = icp(q,P,1000,'Matching','kDtree');
                 P = (R*P + repmat(T,1,length(P)))';
-                % 
-                % figure()
-                % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
-                % hold on
-                % plot3(P(:,1),P(:,2),P(:,3),'.k')
-                % axis equal
         
                 ER_temp(icp_count+1)   = min(ER);
                 ICP{icp_count+1}.P     = P;
             end
-        
-            P = ICP{find(ER_temp == min(ER_temp))}.P;
+
+            ER_temp_s = find((ER_temp == min(ER_temp)) == 1);
+            P = ICP{ER_temp_s(1)}.P;
             
             temp_MeanShape.Points = P;
             MeanShape_Ind.(data_1(subj_count)){bone_count} = triangulation(MeanShape1.ConnectivityList,temp_MeanShape.Points);
@@ -330,11 +325,12 @@ if select_perspective == 1
     perc_stance = 0;
     colormap_choice = 'jet';
     cmap_shift = 1;
+    glyph_trans = [1 1];
 
     while isequal(set_change,1)
         close all
         vis_toggle = 1;
-        RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+        RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 
         while isequal(done_selecting,0)
             done_selecting = menu("Select to save viewing perspective","Save");
@@ -363,7 +359,7 @@ if select_perspective == 1
 
             Prompt(5,:)     = {'Colormap:','CMap',[]};
             
-            for n = [1 3 4]
+            for n = [1 3 4 6]
                 formats(n,1).type   = 'edit';
                 formats(n,1).size = [100 20];                
             end
@@ -371,10 +367,10 @@ if select_perspective == 1
             formats(5,1).type   = 'list';
             formats(5,1).style  = 'popupmenu';
             if isequal(cmap_shift,1)
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','type in your own'};
+                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','type in your own'};
             end
             if exist('colormap_choice_new','var') == 0
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','type in your own'};
+                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','type in your own'};
             elseif exist('colormap_choice_new','var') == 1
                 formats(5,1).items{end} = colormap_choice;
                 formats(5,1).items{end+1} = 'type in your own';
@@ -393,6 +389,9 @@ if select_perspective == 1
                 temp(trem(2:end)) = [];
                 formats(5,1).items = temp;
             end
+
+            Prompt(6,:)         = {'Glyph Transparency:','GlyphTrans',[]};
+            DefAns.GlyphTrans   = sprintf('%s %s', num2str(glyph_trans(1),'%.2f'), num2str(glyph_trans(2),'%.2f')); 
             
             Name   = 'Change figure settings';
             set_inp = inputsdlg(Prompt,Name,formats,DefAns,Options);
@@ -418,6 +417,10 @@ if select_perspective == 1
             for bone_count = 1:bone_amount
                 bone_alph{bone_count} = str2double(ba(bone_count));
             end
+            
+            gt = string(set_inp.GlyphTrans);
+            gt = strsplit(gt,' ');
+            glyph_trans = [str2double(gt(1)) str2double(gt(2))];
         end
     end
     close all
@@ -868,7 +871,7 @@ if stats_type < 3
                 figure()    
                 RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                     ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
     
                 saveas(gcf,sprintf('%s\\%s_vs_%s_%d.tif',tif_folder,string(groups(comparison(1))),string(groups(comparison(2))),n));
                 N_length = [N_length n];
@@ -964,7 +967,7 @@ if stats_type == 3
                     figure()    
                     RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                         ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
         
                     saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,data_1{1},n));
                     N_length = [N_length n];
@@ -1053,7 +1056,7 @@ if stats_type == 4
                         figure()    
                         RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                             ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                            view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+                            view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
             
                         saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,string(data_1(subj_count)),n));
                         N_length = [N_length n];

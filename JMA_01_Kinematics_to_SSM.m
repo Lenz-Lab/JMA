@@ -935,7 +935,7 @@ for group_count = 1:length(groups)
             %% Clear Variables and Save Every X Number of Frames
             clear Temp_STL
             Temp_STL = temp_STL;
-            clearvars -except pool data_dir fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups troubleshoot_mode waitbar_count
+            clearvars -except pool data_dir fldr_name subjects bone_names Data subj_count frame_count g subj_group Temp_STL frame_start overwrite_data TempData save_interval coverage_area_check kine_data_length save_stl_frame save_stl group_count groups troubleshoot_mode waitbar_count waitbar_length W
             
             MF = dir(fullfile(sprintf('%s\\Outputs',data_dir)));
             if isempty(MF) == 1

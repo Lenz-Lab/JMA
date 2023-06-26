@@ -633,8 +633,8 @@ for group_count = 1:length(groups)
                     for n = 1:length(tri_found)
                         temp = find(tri_found(n) == Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(:,2));
                         if isempty(temp) == 0
-                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp(1),2);
-                            tri_cp(k,:)       = temp(1); % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
+                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,2);
+                            tri_cp(k,:)       = temp; % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
                             k = k + 1;
                         end
                     end

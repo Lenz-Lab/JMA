@@ -314,7 +314,9 @@ for n = 1:length(subjects)
         end   
 
     % waitbar update
-    W = waitbar(waitbar_count/waitbar_length,W,'Interpolating Data...');
+    if isgraphics(W) == 1
+        W = waitbar(waitbar_count/waitbar_length,W,'Interpolating Data...');
+    end
     waitbar_count = waitbar_count + 1;
     
     end

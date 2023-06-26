@@ -320,7 +320,9 @@ for subj_count = 1:length(g)
                     ICP{icp_count+1}.P     = P;
 
                     % waitbar update
-                    W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
+                    if isgraphics(W) == 1
+                        W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
+                    end
                     waitbar_count = waitbar_count + 1;                    
                 end
 
@@ -349,7 +351,8 @@ for subj_count = 1:length(g)
                 end
                 clear found_dist min_dist ROI
             end
-            Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone = i_pair;
+            Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone    = i_pair;
+            Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Aligned = ICP_group{subj_count}.P;
         end
         clear P CP
     end
@@ -448,7 +451,9 @@ fprintf('Bone Transformations via Kinematics:\n')
 groups = fieldnames(subj_group);
 
 % waitbar update
-W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+if isgraphics(W) == 1
+    W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+end
 
 for group_count = 1:length(groups)
     subjects = subj_group.(groups{group_count}).SubjectList;
@@ -628,8 +633,8 @@ for group_count = 1:length(groups)
                     for n = 1:length(tri_found)
                         temp = find(tri_found(n) == Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(:,2));
                         if isempty(temp) == 0
-                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,2);
-                            tri_cp(k,:)       = temp; % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
+                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp(1),2);
+                            tri_cp(k,:)       = temp(1); % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
                             k = k + 1;
                         end
                     end
@@ -957,7 +962,9 @@ for group_count = 1:length(groups)
             warning('off',w.identifier);
 
             % waitbar update
-            W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+            if isgraphics(W) == 1
+                W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+            end
             waitbar_count = waitbar_count + 1;             
     
         end

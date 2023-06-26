@@ -29,7 +29,7 @@ bone_names = {inp_ui{1},inp_ui{2}};
 
 study_num  = inp_ui{3};
 
-% mean_or_max = menu('When combining data would you like to take the mean? Or keep only the max value?','Mean','Max');
+mean_or_med = menu('How would you like to combine/pair data?','One-to-one pairing','Mean','Median','Max');
 
 %% Selecting Data
 fldr_name = cell(str2double(study_num),1);
@@ -135,6 +135,10 @@ waitbar_length = 0;
 for n = 1:length(g)
     waitbar_length = waitbar_length + length(fieldnames(A.Data.(g{n}).MeasureData));
 end
+f = fieldnames(A.Data.(g{1}).ImportData);
+
+waitbar_length = waitbar_length*length(f);
+
 waitbar_count = 1;
 
 W = waitbar(waitbar_count/waitbar_length,'Pairing data to correspondence particles...');
@@ -143,57 +147,112 @@ for subj_count  = 1:length(g)
     fprintf('%s\n',g{subj_count})
     temp_stl    = A.Data.(g{subj_count}).(bone_names{1}).(bone_names{1}).Points;
     temp_cp     = A.Data.(g{subj_count}).(bone_names{1}).CP;
+
+    if ~isfield(A.Data.(g{subj_count}).(bone_names{1}),'CP_Aligned')
+        p = temp_stl;
+
+        if isfield(A.Data.(g{subj_count}),'Side') == 1
+            if isequal(A.Data.(g{subj_count}).Side,'Left')
+                p = [-1*p(:,1) p(:,2) p(:,3)]';
+            end
+            if isequal(A.Data.(g{subj_count}).Side,'Right')
+                p = [p(:,1) p(:,2) p(:,3)]';
+            end   
+        elseif isfield(Data.(g{subj_count}),'Side') == 0
+                p = [p(:,1) p(:,2) p(:,3)]';
+        end 
+
+        ER_temp = zeros(12,1);
+        ICP     = cell(12,1);
+        for icp_count = 0:11
+            if icp_count < 4 % x-axis rotation
+                Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
+            elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
+                Rt = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
+            elseif icp_count >= 8 % z-axis rotation
+                Rt = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
+            end
+
+            P = Rt*p;                 
+
+            [R,T,ER] = icp(temp_cp',P,1000,'Matching','kDtree');
+            P = (R*P + repmat(T,1,length(P)))';
+
+            ER_temp(icp_count+1)   = min(ER);
+            ICP{icp_count+1}.P     = P;
+        end
+            ER_temp_s = find((ER_temp == min(ER_temp)) == 1);
+            temp_stl = ICP{ER_temp_s(1)}.P;
+            clear ER_temp ICP   
+
+            % figure()
+            % plot3(temp_stl(:,1),temp_stl(:,2),temp_stl(:,3),'.k')
+            % hold on
+            % plot3(temp_cp(:,1),temp_cp(:,2),temp_cp(:,3),'ob')
+            % axis equal
+    end
+
     f = fieldnames(A.Data.(g{subj_count}).ImportData);
     for imp_count = 1:length(f)
+        fprintf('   %s\n',f{imp_count})
         for frame_count = 1:length(fieldnames(A.Data.(g{subj_count}).ImportData.(f{imp_count})))
             fprintf('   %d\n',frame_count)
             temp_node   = A.Data.(g{subj_count}).ImportData.(f{imp_count}).(sprintf('F_%d',frame_count));
             
             temp_pair  = A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Pair;
             
-            A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count}) = zeros(length(temp_pair(:,1)),1);
-            for n = 1:length(temp_node(:,1))
-                found_pair = find(temp_pair(:,2) == temp_node(n,1));
-                if ~isempty(found_pair)
-                    A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count})(found_pair(1),:) = temp_node(n,2);
+            %% Pairing one-to-one
+            if isequal(mean_or_med,1)
+                A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count}) = zeros(length(temp_pair(:,1)),1);
+                for n = 1:length(temp_node(:,1))
+                    found_pair = find(temp_pair(:,2) == temp_node(n,1));
+                    if ~isempty(found_pair)
+                        A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count})(found_pair(1),:) = temp_node(n,2);
+                    end
                 end
+
+            %%
+            elseif mean_or_med > 1
+                clear dist_i temp_data
+                for n = 1:length(temp_node)
+                    found_dist = pdist2(temp_stl(temp_node(n,1),:),temp_cp);
+                    dist_i{n} = find(found_dist == min(found_dist));
+                end
+    
+                k = 1;
+                while length(dist_i) > 0
+                    temp_data2 = temp_node(find(cell2mat(dist_i) == dist_i{1}),2);
+                    % temp_data2(isnan(temp_data2)) = 0;
+                    temp_data2(isnan(temp_data2)) = [];
+                        % Mean
+                    if isequal(mean_or_med,2)
+                        temp_data(k,:) = [dist_i{1} mean(temp_data2)];
+                        % Median
+                    elseif isequal(mean_or_med,3)
+                        temp_data(k,:) = [dist_i{1} median(temp_data2)];
+                        % Max
+                    elseif isequal(mean_or_med,4)
+                        temp_data(k,:) = [dist_i{1} max(temp_data2)];
+                    end
+                    dist_i(find(cell2mat(dist_i) == dist_i{1})) = [];
+                    k = k + 1;
+                end
+
+                pair = A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Pair(:,1);
+
+                A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count}) = zeros(length(pair),1);
+                for n = 1:length(pair)
+                    ii = find(temp_data(:,1) == pair(n));
+                    if isempty(ii) == 0
+                        A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count})(n,:) = temp_data(ii,2);
+                    end
+                end                
             end
-
-            % A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count})(n,:)
-
-            %%
-            % % clear dist_i temp_data
-            % % for n = 1:length(temp_node)
-            % %     found_dist = pdist2(temp_stl(temp_node(n,1),:),temp_cp);
-            % %     dist_i{n} = find(found_dist == min(found_dist));
-            % % end
-            % % 
-            % % k = 1;
-            % % while length(dist_i) > 0
-            % %     temp_data2 = temp_node(find(cell2mat(dist_i) == dist_i{1}),2);
-            % %     % temp_data2(isnan(temp_data2)) = 0;
-            % %     temp_data2(isnan(temp_data2)) = [];
-            % %     if isequal(mean_or_max,1)
-            % %         temp_data(k,:) = [dist_i{1} mean(temp_data2)];
-            % %     elseif isequal(mean_or_max,2)
-            % %         temp_data(k,:) = [dist_i{1} max(temp_data2)];
-            % %     end
-            % %     dist_i(find(cell2mat(dist_i) == dist_i{1})) = [];
-            % %     k = k + 1;
-            % % end
         
-            %%
-            % % pair = A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Pair(:,1);
-            % % 
-            % % A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count}) = zeros(length(pair),1);
-            % % for n = 1:length(pair)
-            % %     ii = find(temp_data(:,1) == pair(n));
-            % %     if isempty(ii) == 0
-            % %         A.Data.(g{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.(f{imp_count})(n,:) = max(temp_data(ii,2));
-            % %     end
-            % % end
             % waitbar update
-            W = waitbar(waitbar_count/waitbar_length,W,'Pairing data to correspondence particles...');
+            if isgraphics(W) == 1
+                W = waitbar(waitbar_count/waitbar_length,W,'Pairing data to correspondence particles...');
+            end
             waitbar_count = waitbar_count + 1;
         end
     end

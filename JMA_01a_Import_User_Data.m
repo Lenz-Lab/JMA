@@ -147,9 +147,54 @@ for subj_count  = 1:length(g)
     fprintf('%s\n',g{subj_count})
     temp_stl    = A.Data.(g{subj_count}).(bone_names{1}).(bone_names{1}).Points;
     temp_cp     = A.Data.(g{subj_count}).(bone_names{1}).CP;
+
+    if ~isfield(A.Data.(g{subj_count}).(bone_names{1}),'CP_Aligned')
+        p = temp_stl;
+
+        if isfield(A.Data.(g{subj_count}),'Side') == 1
+            if isequal(A.Data.(g{subj_count}).Side,'Left')
+                p = [-1*p(:,1) p(:,2) p(:,3)]';
+            end
+            if isequal(A.Data.(g{subj_count}).Side,'Right')
+                p = [p(:,1) p(:,2) p(:,3)]';
+            end   
+        elseif isfield(Data.(g{subj_count}),'Side') == 0
+                p = [p(:,1) p(:,2) p(:,3)]';
+        end 
+
+        ER_temp = zeros(12,1);
+        ICP     = cell(12,1);
+        for icp_count = 0:11
+            if icp_count < 4 % x-axis rotation
+                Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
+            elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
+                Rt = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
+            elseif icp_count >= 8 % z-axis rotation
+                Rt = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
+            end
+
+            P = Rt*p;                 
+
+            [R,T,ER] = icp(temp_cp',P,1000,'Matching','kDtree');
+            P = (R*P + repmat(T,1,length(P)))';
+
+            ER_temp(icp_count+1)   = min(ER);
+            ICP{icp_count+1}.P     = P;
+        end
+            ER_temp_s = find((ER_temp == min(ER_temp)) == 1);
+            temp_stl = ICP{ER_temp_s(1)}.P;
+            clear ER_temp ICP   
+
+            % figure()
+            % plot3(temp_stl(:,1),temp_stl(:,2),temp_stl(:,3),'.k')
+            % hold on
+            % plot3(temp_cp(:,1),temp_cp(:,2),temp_cp(:,3),'ob')
+            % axis equal
+    end
+
     f = fieldnames(A.Data.(g{subj_count}).ImportData);
     for imp_count = 1:length(f)
-        fprintf('   %s',f{imp_count})
+        fprintf('   %s\n',f{imp_count})
         for frame_count = 1:length(fieldnames(A.Data.(g{subj_count}).ImportData.(f{imp_count})))
             fprintf('   %d\n',frame_count)
             temp_node   = A.Data.(g{subj_count}).ImportData.(f{imp_count}).(sprintf('F_%d',frame_count));
@@ -205,7 +250,9 @@ for subj_count  = 1:length(g)
             end
         
             % waitbar update
-            W = waitbar(waitbar_count/waitbar_length,W,'Pairing data to correspondence particles...');
+            if isgraphics(W) == 1
+                W = waitbar(waitbar_count/waitbar_length,W,'Pairing data to correspondence particles...');
+            end
             waitbar_count = waitbar_count + 1;
         end
     end

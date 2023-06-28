@@ -282,6 +282,7 @@ view(view_perspective)
 camlight(0,0)
 if ColorMap_Flip == 1
     ccmp = colormap(colormap_choice);
+    colormap(ccmp)
 elseif ColorMap_Flip == 2
     ccmp = colormap(colormap_choice);
     colormap(flipud(ccmp))

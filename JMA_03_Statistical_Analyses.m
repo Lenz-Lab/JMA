@@ -1082,4 +1082,5 @@ if stats_type == 4
     end
 end
 
+disp(view_perspective)
 fprintf('Complete!\n')

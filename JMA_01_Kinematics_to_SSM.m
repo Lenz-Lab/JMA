@@ -323,7 +323,8 @@ for subj_count = 1:length(g)
                     if isgraphics(W) == 1
                         W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
                     end
-                    waitbar_count = waitbar_count + 1;                    
+                    waitbar_count = waitbar_count + 1;
+                    pool.IdleTimeout = 30;
                 end
 
                 %%
@@ -633,8 +634,8 @@ for group_count = 1:length(groups)
                     for n = 1:length(tri_found)
                         temp = find(tri_found(n) == Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(:,2));
                         if isempty(temp) == 0
-                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,2);
-                            tri_cp(k,:)       = temp; % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
+                            tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp(1),2);
+                            tri_cp(k,:)       = temp(1); % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
                             k = k + 1;
                         end
                     end
@@ -845,7 +846,7 @@ for group_count = 1:length(groups)
                 tempp = ROI(temp(:) == min(temp));
                 i_CP = Data.(subjects{subj_count}).(bone_names{bone_with_CP}).CP_Bone(find(tri_points(h,1) == Data.(subjects{subj_count}).(bone_names{bone_with_CP}).CP_Bone(:,2)),1);
                 
-                i_surf(k,:) = [i_CP tri_points(h,1) tempp(1) min(temp) 0];
+                i_surf(k,:) = [i_CP(1) tri_points(h,1) tempp(1) min(temp) 0];
             %     tempp(1) == the index of the paired node on the opposing bone surface
                 k = k + 1;
                 end

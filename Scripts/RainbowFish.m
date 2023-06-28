@@ -281,9 +281,10 @@ set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor
 view(view_perspective)
 camlight(0,0)
 if ColorMap_Flip == 1
-    colormap(colormap_choice)
+    ccmp = colormap(colormap_choice);
 elseif ColorMap_Flip == 2
-    colormap(flipud(colormap_choice))
+    ccmp = colormap(colormap_choice);
+    colormap(flipud(ccmp))
 end
 ttl = title(sprintf('%d %%',perc_stance));
 ttl.FontSize = 32;

@@ -526,7 +526,7 @@ if isequal(stats_type,1)
             NewBoneData{bone_count}.Results.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
             NewBoneData{bone_count}.Data_All.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
             for n = 1:min(max_cp{bone_count})
-                for m = 1:10%%%:Bone_Data{bone_count}.max_frames
+                for m = 1:Bone_Data{bone_count}.max_frames
                     clear statdata
                     agrp_id = [];
                     data_all = [];
@@ -750,7 +750,7 @@ if stats_type < 3
     for plot_data = inpdata    
         tif_folder = [];
         N_length = [];
-        for n = 1:10%%%1:Bone_Data{1}.max_frames
+        for n = 1:Bone_Data{1}.max_frames
             %% Create directory to save .tif images
                 tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s\\',data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),string(groups(comparison(1))),string(groups(comparison(2))));
  

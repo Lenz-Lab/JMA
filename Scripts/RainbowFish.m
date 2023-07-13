@@ -1,4 +1,4 @@
-function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,vis_toggle)
+function RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 % RainbowFish(Bone,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter)
 % This function creates a figure for joint space measurement data. This
 % function will take the input data and bin them into a distribution from
@@ -233,14 +233,16 @@ if isempty(NodalIndex{bone_count}) == 0
                 patch(PR,'FaceColor', CMap{bone_count}(n,:), ...
                 'EdgeColor','none',...        
                 'FaceLighting','gouraud',...
-                'AmbientStrength', 0.15);
+                'AmbientStrength', 0.15,...
+                'facealpha',glyph_trans(1));
                 material('dull');
                 hold on
             elseif isempty(temp) == 0 && isempty(CMap{bone_count}) == 0
                 patch(PR,'FaceColor', CMap{bone_count}(n,:), ...
                 'EdgeColor','none',...        
                 'FaceLighting','gouraud',...
-                'AmbientStrength', 0.15);
+                'AmbientStrength', 0.15,...
+                'facealpha',glyph_trans(2));
                 material('dull');
                 hold on            
                 TR = Pspm;
@@ -279,9 +281,11 @@ set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor
 view(view_perspective)
 camlight(0,0)
 if ColorMap_Flip == 1
-    colormap(colormap_choice)
+    ccmp = colormap(colormap_choice);
+    colormap(ccmp)
 elseif ColorMap_Flip == 2
-    colormap(flipud(colormap_choice))
+    ccmp = colormap(colormap_choice);
+    colormap(flipud(ccmp))
 end
 ttl = title(sprintf('%d %%',perc_stance));
 ttl.FontSize = 32;

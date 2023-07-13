@@ -180,13 +180,18 @@ max_frames = max(temp_length);
 %% Move Data structure to data structure for data manipulation
 for n = 1:length(subjects)
     f = fieldnames(Data.(subjects{n}).MeasureData);
-    for m = 1:length(f)        
+    for m = 1:length(f)   
         % Correspondence Particle Index
         data.(subjects{n}).CP.(f{m})(:,1) = Data.(subjects{n}).MeasureData.(f{m}).Pair(:,1);
         g = fieldnames(Data.(subjects{n}).MeasureData.(f{m}).Data);
-        for k = 1:length(g)
-            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1))
-                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
+
+        if n == 1
+            gn = g;
+        end
+
+        for k = 1:length(gn)
+            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(gn{k})(:,1))
+                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(gn{k})(p,1);
                 nan_temp(isnan(nan_temp)) = 0;
                 data.(subjects{n}).CP.(f{m})(p,k+1) = nan_temp;
             end           
@@ -221,7 +226,8 @@ for n = 1:length(subjects)
     for CItoDist = 1:length(g)
         temp = cell(1,length(data.(subjects{n}).Frame(:,1)));
         for m = 1:length(data.(subjects{n}).Frame(:,1))
-	        temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
+	        % temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
+            temp(:,m) = {[data.(subjects{n}).CP.F_1(:,1) data.(subjects{n}).CP.F_1(:,CItoDist+1)]};
         end
         
         cp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));

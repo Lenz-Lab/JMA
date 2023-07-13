@@ -98,7 +98,7 @@ for n = 1:str2double(study_num)
 end
 
 delete(gcp('nocreate'))
-pool = parpool([1 12]);
+pool = parpool([1 100]);
 clc
 
 %% Loading Data
@@ -251,8 +251,6 @@ waitbar_length = 0;
 for n = 1:length(g)
     waitbar_length = waitbar_length + length(Data.(g{n}).(bone_names{1}).Kinematics(:,1));
 end
-% Add ICP alignment to CP
-waitbar_length = waitbar_length + (12*length(g));
 waitbar_count = 1;
 
 W = waitbar(waitbar_count/waitbar_length,'Identifying bone indices to correspondence particles...');
@@ -296,16 +294,17 @@ for subj_count = 1:length(g)
                 %% Error ICP
                 ER_temp = zeros(12,1);
                 ICP     = cell(12,1);
+                RT      = cell(12,1);
                 for icp_count = 0:11
                     if icp_count < 4 % x-axis rotation
-                        Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
-                    elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
-                        Rt = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
+                        Rt{icp_count+1} = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
+                    elseif{icp_count+1} icp_count >= 4 && icp_count < 8 % y-axis rotation
+                        Rt{icp_count+1} = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
                     elseif icp_count >= 8 % z-axis rotation
-                        Rt = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
+                        Rt{icp_count+1} = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
                     end
 
-                    P = Rt*p;                 
+                    P = Rt{icp_count+1}*p;                 
     
                     [R,T,ER] = icp(q,P,1000,'Matching','kDtree');
                     P = (R*P + repmat(T,1,length(P)))';
@@ -318,14 +317,14 @@ for subj_count = 1:length(g)
     
                     ER_temp(icp_count+1)   = min(ER);
                     ICP{icp_count+1}.P     = P;
-
-                    % waitbar update
-                    if isgraphics(W) == 1
-                        W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
-                    end
-                    waitbar_count = waitbar_count + 1;
-                    pool.IdleTimeout = 30;
                 end
+
+                % waitbar update
+                if isgraphics(W) == 1
+                    W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
+                end
+                waitbar_count = waitbar_count + 1;
+                pool.IdleTimeout = 30;                
 
                 %%
                 ER_temp_s = find((ER_temp == min(ER_temp)) == 1);

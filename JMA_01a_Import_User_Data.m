@@ -15,7 +15,7 @@
 % Notes: 
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
 addpath(sprintf('%s\\Scripts',pwd))

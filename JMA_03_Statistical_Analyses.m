@@ -94,30 +94,33 @@ end
 
 %%
 if stats_type <= 2
-[indx,tf] = listdlg('ListString',string(g),'Name','Please select groups','ListSize',[500 500]);
-
-if length(indx) < 2
-    gg = g;
-    [ind,tf] = listdlg('ListString',gg,'Name','Please select remaining groups','ListSize',[500 500]);
-    indx =  [indx;ind];
-end
-
-groups = cell(length(indx),1);
-for n = 1:length(indx)
-    groups{n} = g(indx(n));
-end
-
-[comparison(1), ~] = listdlg('ListString',string(groups),'Name','Please select Group 1 (this is what will be visualized)','ListSize',[500 250]);
-[comparison(2), ~] = listdlg('ListString',string(groups),'Name','Please select Group 2','ListSize',[500 250]);
-
-comp_flip  = 0;
-if comparison(1) > comparison(2)
-    comp_flip = 1;
-end
-
-groups = fieldnames(subj_group);
-data_1 = string(groups(comparison(1)));
-data_2 = string(groups(comparison(2)));
+    g = fieldnames(subj_group);
+    [indx,tf] = listdlg('ListString',string(g),'Name','Please select groups','ListSize',[500 500]);
+    
+    if length(indx) < 2
+        gg = g;
+        [ind,tf] = listdlg('ListString',gg,'Name','Please select remaining groups','ListSize',[500 500]);
+        indx =  [indx;ind];
+    end
+    
+    groups = cell(length(indx),1);
+    for n = 1:length(indx)
+        groups{n} = g(indx(n));
+    end
+    
+    [comparison(1), ~] = listdlg('ListString',string(groups),'Name','Please select Group 1 (this is what will be visualized)','ListSize',[500 250]);
+    [comparison(2), ~] = listdlg('ListString',string(groups),'Name','Please select Group 2','ListSize',[500 250]);
+    
+    comp_flip  = 0;
+    if comparison(1) > comparison(2)
+        comp_flip = 1;
+    end
+    
+    data_1 = string(groups(comparison(1)));
+    data_2 = string(groups(comparison(2)));
+    
+    disp(data_1)
+    disp(data_2)
 
 elseif stats_type == 3 % Group no stats
     %%
@@ -148,12 +151,12 @@ elseif stats_type == 4 % Individual no stats
                 bone_check  = 0;
                 group_check = 0;    
                 for d = 1:length(temp)
-                    bone_c  = strfind(lower(string(bone_names(1))),lower(string(temp(d))));
-                    group_c = strfind(lower(data_1(subj_count)),lower(string(temp(d))));
-                    if isempty(bone_c) == 0
+                    bone_c  = isequal(lower(string(bone_names(1))),lower(string(temp(d))));
+                    group_c = isequal(lower(data_1(subj_count)),lower(string(temp(d))));
+                    if isequal(bone_c,1)
                         bone_check = 1;
                     end
-                    if isempty(group_c) == 0
+                    if isequal(group_c,1)
                         group_check = 1;
                     end
                     if bone_check == 1 && group_check == 1
@@ -181,15 +184,16 @@ if stats_type < 4
             bone_check  = 0;
             group_check = 0;
             for d = 1:length(temp)
-                bone_c  = strfind(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
-                group_c = strfind(lower(data_1),lower(string(temp(d))));
-                if isempty(bone_c) == 0
+                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
+                group_c = isequal(lower(data_1),lower(string(temp(d))));
+                if isequal(bone_c,1)
                     bone_check = 1;
                 end
-                if isempty(group_c) == 0
+                if isequal(group_c,1)
                     group_check = 1;
                 end
                 if bone_check == 1 && group_check == 1
+                    % sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name)
                     MeanShape{bone_count} = stlread(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
                 end
             end
@@ -205,15 +209,16 @@ if stats_type < 4
             bone_check  = 0;
             group_check = 0;
             for d = 1:length(temp)
-                bone_c  = strfind(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
-                group_c = strfind(lower(data_1),lower(string(temp(d))));
-                if isempty(bone_c) == 0
+                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
+                group_c = isequal(lower(data_1),lower(string(temp(d))));
+                if isequal(bone_c,1)
                     bone_check = 1;
                 end
-                if isempty(group_c) == 0
+                if isequal(group_c,1)%isempty(group_c) == 0
                     group_check = 1;
                 end
                 if bone_check == 1 && group_check == 1
+                    % sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name)
                     MeanCP{bone_count} = load(sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name));
                 end
             end
@@ -277,8 +282,11 @@ end
 % Baseline before user changes.
 % Cirlce Color
 circle_color = [1 0 1];
+
 % Glyph size
 glyph_size = 1;
+glyph_trans = [1 1];
+
 % Bone Transparency
 for bone_count = 1:bone_amount
     bone_alph{bone_count} = 1;
@@ -429,7 +437,6 @@ if select_perspective == 1
 end
 
 %% Limit Selection
-clc
 fprintf('Selecting Limits...\n')
 g = fieldnames(Bone_Data{1}.DataOut);
 for n = inpdata
@@ -437,7 +444,7 @@ for n = inpdata
     clear U_temp
     mcomp = [];
         for b = 1:bone_amount
-            mcomp = [mcomp; Bone_Data{b}.DataOutAll.(string(g(n)))];
+            mcomp = [mcomp Bone_Data{b}.DataOutAll.(string(g(n)))];
         end
     listdata{n} = char(sprintf('%s %s',num2str(mean(mcomp)-std(mcomp)*2,'%.2f'),num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
     if isequal(lower(string(g(n))),'distance')
@@ -519,7 +526,7 @@ if isequal(stats_type,1)
             NewBoneData{bone_count}.Results.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
             NewBoneData{bone_count}.Data_All.(g{g_count}) = cell(min(max_cp{bone_count}),Bone_Data{bone_count}.max_frames);
             for n = 1:min(max_cp{bone_count})
-                for m = 1:Bone_Data{bone_count}.max_frames
+                for m = 1:10%%%:Bone_Data{bone_count}.max_frames
                     clear statdata
                     agrp_id = [];
                     data_all = [];
@@ -743,14 +750,13 @@ if stats_type < 3
     for plot_data = inpdata    
         tif_folder = [];
         N_length = [];
-        for n = 1:Bone_Data{1}.max_frames
+        for n = 1:10%%%1:Bone_Data{1}.max_frames
             %% Create directory to save .tif images
                 tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s\\',data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),string(groups(comparison(1))),string(groups(comparison(2))));
-    
-    
+ 
             if n == 1
                 disp(tif_folder)
-                fprintf('%s: %s vs %s\n',string(groups(comparison(1))),string(groups(comparison(1))),string(groups(comparison(2))))
+                fprintf('%s: %s vs %s\n',string(groups{comparison(1)}),string(groups{comparison(1)}),string(groups{comparison(2)}))
     
                 % Create directory to save results
                 mkdir(tif_folder);
@@ -999,7 +1005,7 @@ if stats_type == 4
         for plot_data = inpdata    
                 tif_folder = [];
                 N_length = [];
-                for n = 1:Bone_Data{1}.max_frames
+                for n = 1:10%%1:Bone_Data{1}.max_frames
                     %% Create directory to save .tif images
                         tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                             ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...

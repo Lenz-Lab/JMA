@@ -298,7 +298,7 @@ for subj_count = 1:length(g)
                 for icp_count = 0:11
                     if icp_count < 4 % x-axis rotation
                         Rt{icp_count+1} = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
-                    elseif{icp_count+1} icp_count >= 4 && icp_count < 8 % y-axis rotation
+                    elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
                         Rt{icp_count+1} = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
                     elseif icp_count >= 8 % z-axis rotation
                         Rt{icp_count+1} = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];

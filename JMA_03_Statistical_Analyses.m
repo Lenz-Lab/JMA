@@ -65,17 +65,17 @@ uiwait(msgbox({'Please select the .mat file with the normalized data to be proce
 
 addpath(sprintf('%s\\Mean_Models',data_dir))
 
-fprintf('Loading Data...\n')
+fprintf('Loading Data...\n')        
+file_name_bone = cell(bone_amount,1);
+Bone_Data      = cell(bone_amount,1);
 for bone_count = 1:bone_amount 
     file_name_bone{bone_count} = uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',data_dir));
     Bone_Data{bone_count} = load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,file_name_bone{bone_count}));
 end
 
 %% Selecting Groups
-clc
 fprintf('Selecting Groups...\n')
 subj_group = Bone_Data{1}.subj_group;
-g = fieldnames(subj_group);
 groups = fieldnames(subj_group);
 t1 = 'Please select groups';
 
@@ -121,6 +121,10 @@ if stats_type <= 2
     
     disp(data_1)
     disp(data_2)
+    
+    if isequal(stats_type,1)
+        combine_stats = menu('Would you like to combine the statistical analyses?','Yes','No');
+    end
 
 elseif stats_type == 3 % Group no stats
     %%
@@ -138,6 +142,7 @@ elseif stats_type == 4 % Individual no stats
     norm_raw = menu('Would you like to see normalized or raw results?','Normalized','Raw');
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
+    Bone_Ind = cell(bone_amount,1);
     for bone_count = 1:bone_amount
         for subj_count = 1:length(data_1)
             S = dir(fullfile(sprintf('%s\\%s\\%s',data_dir,string(groups),data_1(subj_count)),'*.mat'));
@@ -148,18 +153,23 @@ elseif stats_type == 4 % Individual no stats
                 temp = split(string(temp(1)),'_');
             
                 bone_names = Bone_Data{bone_count}.bone_names;
-                bone_check  = 0;
+                bone_check1  = 0;
+                bone_check2  = 0;
                 group_check = 0;    
                 for d = 1:length(temp)
-                    bone_c  = isequal(lower(string(bone_names(1))),lower(string(temp(d))));
+                    bone_c1  = isequal(lower(string(bone_names(1))),lower(string(temp(d))));
+                    bone_c2  = isequal(lower(string(bone_names(2))),lower(string(temp(d))));
                     group_c = isequal(lower(data_1(subj_count)),lower(string(temp(d))));
-                    if isequal(bone_c,1)
-                        bone_check = 1;
+                    if isequal(bone_c1,1)
+                        bone_check1 = 1;
                     end
+                    if isequal(bone_c2,1)
+                        bone_check2 = 1;
+                    end                    
                     if isequal(group_c,1)
                         group_check = 1;
                     end
-                    if bone_check == 1 && group_check == 1
+                    if isequal(bone_check1,1) && isequal(bone_check2,1) && isequal(group_check,1)
                         Bone_Ind{bone_count}.(string(data_1(subj_count))) = load(S(c).name);
                     end
                 end
@@ -174,6 +184,7 @@ clear Prompt DefAns Name formats
 
 %% Load .stl Bone File for Plots
 if stats_type < 4
+    MeanShape = cell(bone_amount,1);
     for bone_count = 1:bone_amount
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
         for c = 1:length(S)
@@ -200,7 +211,8 @@ if stats_type < 4
         end
         
         %% Load .particles File for Plots
-        S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.particles'));     
+        S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.particles')); 
+        MeanCP = cell(bone_amount,1);
         for c = 1:length(S)
             temp = strsplit(S(c).name,'.');
             temp = strrep(temp(1),' ','_');
@@ -226,7 +238,6 @@ if stats_type < 4
     end
 elseif stats_type == 4
     %%
-    clc
     fprintf('Aligning bones to correspondence particles...\n')
     for subj_count = 1:length(data_1)
         for bone_count = 1:bone_amount
@@ -251,6 +262,8 @@ elseif stats_type == 4
             end
 
 %% Error ICP
+            ER_temp = zeros(1,12);
+            ICP     = cell(1,12);
             for icp_count = 0:11
                 if icp_count < 4 % x-axis rotation
                     Rt = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
@@ -288,6 +301,7 @@ glyph_size = 1;
 glyph_trans = [1 1];
 
 % Bone Transparency
+bone_alph = cell(1,bone_amount);
 for bone_count = 1:bone_amount
     bone_alph{bone_count} = 1;
 end
@@ -297,7 +311,7 @@ colormap_choice = 'jet';
 clear Prompt DefAns Name formats Options
 
 if select_perspective == 1
-    clc
+
     fprintf('Changing figure settings...\n')
     uiwait(msgbox('It will take time to load the bone and correspondence models when selecting, thanks for your patience!'))
     close all
@@ -309,6 +323,9 @@ if select_perspective == 1
         MeanShape{1} = MeanShape_Ind.(string(g_ind(1))){1};
     end
     
+    SPMIndex    = cell(1,bone_amount);
+    NodalIndex  = cell(1,bone_amount);
+    NodalData   = cell(1,bone_amount);
     for bone_count = 1:bone_amount
         color_map_temp = normrnd(0,1,[1,length(MeanCP{bone_count}(:,1))])';
         clear t
@@ -375,17 +392,17 @@ if select_perspective == 1
             formats(5,1).type   = 'list';
             formats(5,1).style  = 'popupmenu';
             if isequal(cmap_shift,1)
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','type in your own'};
+                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
             end
             if exist('colormap_choice_new','var') == 0
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','type in your own'};
+                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
             elseif exist('colormap_choice_new','var') == 1
                 formats(5,1).items{end} = colormap_choice;
                 formats(5,1).items{end+1} = 'type in your own';
             end
             
             if isequal(cmap_shift,2)
-                clear temp
+                temp = cell(1,1);
                 for y = 1:length(formats(5,1).items)+1
                     if y == 1
                         temp{y} = char(colormap_choice);
@@ -439,13 +456,15 @@ end
 %% Limit Selection
 fprintf('Selecting Limits...\n')
 g = fieldnames(Bone_Data{1}.DataOut);
+listname = cell(1,length(inpdata));
+listdata = cell(1,length(inpdata));
 for n = inpdata
     listname{1,n} = char(g(n));
     clear U_temp
     mcomp = [];
-        for b = 1:bone_amount
-            mcomp = [mcomp Bone_Data{b}.DataOutAll.(string(g(n)))];
-        end
+    for b = 1:bone_amount
+        mcomp(:,end+1) = Bone_Data{b}.DataOutAll.(string(g(n)));
+    end   
     listdata{n} = char(sprintf('%s %s',num2str(mean(mcomp)-std(mcomp)*2,'%.2f'),num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
     if isequal(lower(string(g(n))),'distance')
         listdata{1,n} = char(sprintf('%d %d',0,6));
@@ -457,15 +476,15 @@ end
 
 clear Prompt DefAns Name formats
 k = 1;
-Prompt = {};
+Prompt = cell(length(inpdata)+1,1);
 for n = [inpdata inpdata(end)+1]
     if n <= inpdata(end)
-        Prompt(end+1,:)                         = {sprintf('%s',listname{1,n},blanks(30-length(listname{1,n}))),sprintf('A%d',k),[]};
+        Prompt(n,:)                         = {sprintf('%s',listname{1,n},blanks(30-length(listname{1,n}))),sprintf('A%d',k),[]};
         DefAns.(sprintf('A%d',k))               = char(string(listdata{1,n}));
         formats(k,1).type                       = 'edit';
         formats(k,1).size                       = [200-length(char(string(listdata{1,n}))) 20]; 
         k = k + 1;
-        Prompt(end+1,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
+        Prompt(n,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
         formats(k,2).type                       = 'check';
         if isequal(lower(string(g(n))),'distance')
             DefAns.(sprintf('A%d',k))           = true;
@@ -475,7 +494,7 @@ for n = [inpdata inpdata(end)+1]
         k = k + 1;
     elseif n > inpdata(end)
         limitname = 'Set distance limits for removing particles from analysis:';
-        Prompt(end+1,:)                         = {sprintf('%s',limitname,blanks(30-length(limitname))),sprintf('A%d',k),[]};
+        Prompt(n,:)                         = {sprintf('%s',limitname,blanks(30-length(limitname))),sprintf('A%d',k),[]};
         DefAns.(sprintf('A%d',k))               = '0 6';
         formats(k,1).type                       = 'edit';
         formats(k,1).size                       = [100-length(limitname) 20];
@@ -505,7 +524,6 @@ temp = strsplit(inp_limit.(string(g(end))),' ');
 Distance_Upper = str2double(cell2mat(temp(2)));
 Distance_Lower = str2double(cell2mat(temp(1)));
 
-clc
 fprintf('Processing...\n')
 %% ANOVA or t-Tests
 if isequal(stats_type,1)
@@ -693,8 +711,7 @@ if isequal(stats_type,3) || isequal(stats_type,4)
     reg_sig = [];
 end
 
-%% Create Figures
-% Will create figures
+%% Name Figures
 if isequal(stats_type,1)
     if isequal(normal_flag,0)
         if isequal(test_type,1)
@@ -746,6 +763,11 @@ if ~isequal(additional_name,'')
     end
 end
 
+if isequal(colormap_choice,'difference')
+    bone_comparison_name = strcat(bone_comparison_name,'_diff');
+end
+
+%% Create Figures
 if stats_type < 3
     for plot_data = inpdata    
         tif_folder = [];
@@ -805,7 +827,11 @@ if stats_type < 3
                                     && length(data_cons1) >= floor(length(subj_group.(data_1).SubjectList)*(perc_part(1)/100)) && length(data_cons2) >= floor(length(subj_group.(data_2).SubjectList)*(perc_part(2)/100))
                                 % NewBoneData{bone_count}.temp(k,:) = [m mean(data_cons1)];
                                 NodalIndex{bone_count}(k,:) = m;
-                                NodalData{bone_count}(k,:) = mean(data_cons1);
+                                if ~isequal(colormap_choice,'difference')
+                                    NodalData{bone_count}(k,:) = mean(data_cons1);
+                                elseif isequal(colormap_choice,'difference')
+                                    NodalData{bone_count}(k,:) = mean(data_cons1) - mean(data_cons2);
+                                end
                                 k = k + 1;
                             end
                         end
@@ -817,14 +843,26 @@ if stats_type < 3
                         if isempty(a) == 0 
                             if length(a) > 1
                                 if a(:,1) > 0 && a(:,2) > 0
-                                    if not_normal.(string(g(plot_data)))      == 0 && a(:,2) <= alpha_val
-                                        reg_sig{bone_count}(f)      = a(:,2);
-                                        SPM_index{bone_count}(f)    = m;
-                                        f = f + 1;
-                                    elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val
-                                        reg_sig{bone_count}(f)      = a(:,1);
-                                        SPM_index{bone_count}(f)    = m;
-                                        f = f + 1;
+                                    if isequal(combine_stats,1)
+                                        if a(:,2) <= alpha_val || a(:,1) <= alpha_val
+                                            if a(:,2) < a(:,1)
+                                                reg_sig{bone_count}(f)      = a(:,2);
+                                            elseif a(:,1) <= a(:,2)
+                                                reg_sig{bone_count}(f)      = a(:,1);
+                                            end
+                                            SPM_index{bone_count}(f)    = m;
+                                            f = f + 1;
+                                        end
+                                    elseif isequal(combine_stats,2)
+                                        if not_normal.(string(g(plot_data)))      == 0 && a(:,2) <= alpha_val
+                                            reg_sig{bone_count}(f)      = a(:,2);
+                                            SPM_index{bone_count}(f)    = m;
+                                            f = f + 1;
+                                        elseif not_normal.(string(g(plot_data)))  == 1 && a(:,1) <= alpha_val
+                                            reg_sig{bone_count}(f)      = a(:,1);
+                                            SPM_index{bone_count}(f)    = m;
+                                            f = f + 1;
+                                        end
                                     end
                                 end
                             end
@@ -903,7 +941,6 @@ if stats_type < 3
 end
 
 %%
-clc
 if stats_type == 3
     subj_group = Bone_Data{bone_count}.subj_group;
     for plot_data = inpdata    

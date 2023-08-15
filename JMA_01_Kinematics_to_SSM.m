@@ -295,10 +295,11 @@ for subj_count = 1:length(g)
                 ER_temp = zeros(12,1);
                 ICP     = cell(12,1);
                 RT      = cell(12,1);
+                Rt      = cell(12,1);
                 for icp_count = 0:11
                     if icp_count < 4 % x-axis rotation
                         Rt{icp_count+1} = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
-                    elseif{icp_count+1} icp_count >= 4 && icp_count < 8 % y-axis rotation
+                    elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
                         Rt{icp_count+1} = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
                     elseif icp_count >= 8 % z-axis rotation
                         Rt{icp_count+1} = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
@@ -532,7 +533,9 @@ for group_count = 1:length(groups)
                         temp_normal = faceNormal(temp_STL.(bone_names{bone_count}));
                         clear Temp_STL
                     else
-                        i_ROI = Data.(subjects{subj_count}).MeasureData.(sprintf('F_%d',frame_count-1)).Pair(:,2);
+                        FF = fieldnames(Data.(subjects{subj_count}).MeasureData);
+                        i_ROI = Data.(subjects{subj_count}).MeasureData.(FF{end}).Pair(:,2);
+                        % i_ROI = Data.(subjects{subj_count}).MeasureData.(sprintf('F_%d',frame_count-1)).Pair(:,2);
     
                         % tol -> finds the maximum distance difference from
                         % last frames positions to the current frames position

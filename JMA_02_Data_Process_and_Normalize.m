@@ -446,10 +446,10 @@ if length(Data.(g{g_count}).CoverageArea.F_1) == 1
         surf_area{1,g_count} = g{g_count};
         surf_area{2,g_count} = bone_names{1};
         for frame_count = 1:length(gg)
-            if iscell(Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
-                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
+            if iscell(Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1)) == 1
+                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(gg{frame_count}){:,1};
             else 
-                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
+                surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1);
             end
         end
     end
@@ -461,12 +461,12 @@ elseif length(Data.(g{g_count}).CoverageArea.F_1) == 2
         surf_area{2,g_spacer(g_count)} = bone_names{1};
         surf_area{2,g_spacer(g_count)+1} = bone_names{2};
         for frame_count = 1:length(gg)
-            if iscell(Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1)) == 1
-                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1};
-                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,2};
+            if iscell(Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1)) == 1
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(gg{frame_count}){:,1};
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(gg{frame_count}){:,2};
             else
-                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,1);
-                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(sprintf('F_%d',frame_count))(:,2);
+                surf_area{frame_count+2,g_spacer(g_count)}      = Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1);
+                surf_area{frame_count+2,g_spacer(g_count)+1}    = Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,2);
             end
         end
     end

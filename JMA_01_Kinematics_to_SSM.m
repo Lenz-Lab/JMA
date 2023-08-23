@@ -19,37 +19,6 @@
 % Please update bone_names variable with the names of the bones of
 % interest. Spelling is very important and must be consistent in all file
 % names!
-clear;
-
-inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name of opposite bone:',...
-    'Enter number of study groups:','Would you like to overwrite previous data (No = 0, Yes = 1)?',...
-    'How often would you like to save the .mat file in case of interruptions?',...
-    'Do you want to calculate surface area on both bone surfaces? (No = 0, Yes = 1)(will double the amount of time)',...
-    'Would you like to save coverage area .stl files for each time step? (No = 0, Yes = 1)'...
-    'Would you like to troubleshoot? (No = 0, Yes = 1)'},...
-    'User Inputs',[1 100],{'Calcaneus','Talus','1','1','50','0','0','0'});
-
-bone_names = {inp_ui{1},inp_ui{2}};
-
-study_num  = inp_ui{3};
-
-overwrite_data = str2double(inp_ui{4}); % overwrite_data = 1, Will overwrite current .mat files for subjects
-                                        % overwrite_data = 0, Will load subject .mat files if in folder
-
-% This is useful if processing and there is an interruption or processing
-% in increments. 
-save_interval = str2double(inp_ui{5});
-
-% Save the coverage area .stl files and pick which frames
-coverage_area_check = str2double(inp_ui{6});
-
-% Save the coverage area .stl files and pick which frames
-save_stl = str2double(inp_ui{7});
-
-troubleshoot_mode = str2double(inp_ui{8});
-
-uiwait(msgbox('Please select the directory where the data is located'))
-data_dir = string(uigetdir());
 
 % Folder Architecture:
 % Main Directory -> (folder containing each of the group folders)
@@ -84,15 +53,74 @@ data_dir = string(uigetdir());
 % Please read the standard operating procedure (SOP) included in the
 % .github repository. 
 
+clear;
+
+%% User Inputs
+addpath(sprintf('%s\\Scripts',pwd))
+Options.Resize = 'on';
+Options.Interpreter = 'tex';
+
+Prompt(1,:)             = {'Enter name of the bone that data will be mapped to (visualized on):','Bone1',[]};
+DefAns.Bone1            = 'Calcaneus';
+formats(1,1).type       = 'edit';
+formats(1,1).size       = [100 20];
+
+Prompt(2,:)             = {'Enter name of opposite bone:','Bone2',[]};
+DefAns.Bone2            = 'Talus';
+formats(2,1).type       = 'edit';
+formats(2,1).size       = [100 20];
+
+Prompt(3,:)             = {'Enter number of study groups:','GrpCount',[]};
+DefAns.GrpCount         = '1';
+formats(3,1).type       = 'edit';
+formats(3,1).size       = [100 20];
+
+Prompt(4,:)             = {'Would you like to overwrite previous data?','OWrite',[]};
+DefAns.OWrite           = false;
+formats(4,1).type       = 'check';
+formats(4,1).size       = [100 20];
+
+Prompt(5,:)             = {'How often would you like to save the .mat file in case of interruptions? (dynamic)','SaveMat',[]};
+DefAns.SaveMat          = '50';
+formats(5,1).type       = 'edit';
+formats(5,1).size       = [100 20];
+
+Prompt(6,:)             = {'Calculate surface area on both surfaces? (will double the amount of time)','CovArea',[]};
+DefAns.CovArea          = false;
+formats(6,1).type       = 'check';
+formats(6,1).size       = [100 20];
+
+Prompt(7,:)             = {'Save coverage area .stl files? (will save for each time step)','SavArea',[]};
+DefAns.SavArea          = false;
+formats(7,1).type       = 'check';
+formats(7,1).size       = [100 20];
+
+Prompt(8,:)             = {'Troubleshoot? (verify correspondence particles)','TrblShoot',[]};
+DefAns.TrblShoot        = false;
+formats(8,1).type       = 'check';
+formats(8,1).size       = [100 20];
+
+set_inp                 = inputsdlg(Prompt,'User Inputs',formats,DefAns,Options);
+
+bone_names              = {set_inp.Bone1,set_inp.Bone2};
+study_num               = str2double(set_inp.GrpCount);
+overwrite_data          = set_inp.OWrite;
+save_interval           = str2double(set_inp.SaveMat);
+coverage_area_check     = set_inp.CovArea;
+save_stl                = set_inp.SavArea;
+troubleshoot_mode       = set_inp.TrblShoot;
+
+uiwait(msgbox('Please select the directory where the data is located'))
+data_dir = string(uigetdir());
+
 %% Clean Slate
-clc; close all; clearvars -except bone_names study_num overwrite_data save_interval coverage_area_check save_stl_frame save_stl data_dir troubleshoot_mode
 addpath(sprintf('%s\\Scripts',pwd))
 addpath(sprintf('%s\\Mean_Models',data_dir)) 
 
 %% Selecting Data
-fldr_name = cell(str2double(study_num),1);
-for n = 1:str2double(study_num)
-    uiwait(msgbox(sprintf('Please select the %d study group',n)))
+fldr_name = cell(study_num,1);
+for n = 1:study_num
+    uiwait(msgbox(sprintf('Please select study group: %d (of %d)',n,study_num)))
     fldr_name{n} = uigetdir(data_dir);
     addpath(fldr_name{n})
 end
@@ -107,7 +135,7 @@ fprintf('Loading Data:\n')
 subjects = cell(1000,1);
 
 subj_count = 1;
-for n = 1:str2double(study_num)
+for n = 1:study_num
     D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
     
     m = 1;

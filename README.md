@@ -5,6 +5,7 @@
 Toolbox for calculating intra-articular joint measurements.
 
 ## Workflow
-![Capture](https://github.com/Lenz-Lab/JMA/assets/69816397/7ba822dd-e159-422c-bbb3-d8738d161304)
+![image](https://github.com/Lenz-Lab/JMA/assets/69816397/79ed7059-d475-4531-a017-49fc7eeb09d0)
+
 
 

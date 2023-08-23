@@ -269,7 +269,7 @@ for bone_count = 1:bone_amount
                 PR = Ptemp;
                 PR.vertices = PR.vertices + MeanCP{bone_count}(NodalIndex{bone_count}(n,:),:);
                
-            %%% if NodalData{bone_count}(n,:) >=  CLimits(1) && NodalData{bone_count}(n,:) <= CLimits(2)
+            if NodalData{bone_count}(n,:) >=  CLimits(1) && NodalData{bone_count}(n,:) <= CLimits(2)
                 temp = find(NodalIndex{bone_count}(n,:) == SPMIndex{bone_count});
                 if isempty(temp) == 1 && isempty(CMap{bone_count}) == 0
                     if isequal(NodalData{bone_count}(n,:),9999) %%%
@@ -320,7 +320,7 @@ for bone_count = 1:bone_amount
                     clear TR
                     hold on
                 end
-            %%% end
+            end
         end
     end
 end

@@ -16,46 +16,40 @@ clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 
 %% User Inputs
-
-stats_type = menu('What statistical analysis would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank Sum)','Statistical Parametric Analysis','Group Results (no stats)','Individual Results (no stats)');
+stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
 
 inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
-    'View Perspective(1)',...
-    'View Perspective(2)',...
-    'Select viewing perspective and modify figure outputs? (Yes = 1, No = 0)',...
     'Alpha Value (confidence interval)',...
-    'Frame Rate (video)'},...
-    'User Inputs',[1 100],{'','20','45','0','0.05','7'});
+    'Frame Rate (video, dynamic only)'},...
+    'User Inputs',[1 100],{'','0.05','7'});
 
 additional_name = string(inp_ui{1});
 
-view_perspective = [str2double(inp_ui{2}) str2double(inp_ui{3})]; % Sets the angles for the view perspective of
-% the .tif files
-
-% Creates a figure to select the viewing perspective
-select_perspective = str2double(inp_ui{4});
-
 % Alpha value for stats
-alpha_val = str2double(inp_ui{5});
+alpha_val = str2double(inp_ui{2});
 
-frame_rate = str2double(inp_ui{6});
+frame_rate = str2double(inp_ui{3});
 
 if isequal(stats_type,1)
-    inp_uii = inputdlg({'What is the minimum percentage of patients that must be included for Group 1? (%)'...
-        'What is the minimum percentage of patients that must be included for Group 2? (%)'}...
+    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for Group 1? (%)'...
+        'What is the minimum percentage of participants that must be included for Group 2? (%)'}...
         ,'Quantity at particle to be included',[1 100],{'100','100'});    
     % percentage of partipants to be included in the analysis
     perc_part = [str2double(inp_uii{1}) str2double(inp_uii{2})];
 elseif isequal(stats_type,3)
-    inp_uii = inputdlg({'What is the minimum percentage of patients that must be included for the group? (%)'},...
+    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for the group? (%)'},...
         'Quantity at particle to be included',[1 100],{'100'});    
     perc_part = [str2double(inp_uii{1})];
 end
 
 %% Number of Bones
-inp_ui = inputdlg({'How many bones would you like to include?'},'Multiple Bone Visualization',[1 50],{'1'});
+mult_group_bone = menu('Would you like to include multiple results (more than one bone, or one bone with multiple results mapped)?','Yes','No');
 
-bone_amount = str2double(inp_ui{1});
+bone_amount = 1;
+if isequal(mult_group_bone,1)
+    inp_ui = inputdlg({'How many results would you like to include?'},'Multiple Bone Visualization',[1 50],{'1'});
+    bone_amount = str2double(inp_ui{1});
+end
 
 %% Load Data
 uiwait(msgbox('Please select the directory where the data is located'))
@@ -108,8 +102,8 @@ if stats_type <= 2
         groups{n} = g(indx(n));
     end
     
-    [comparison(1), ~] = listdlg('ListString',string(groups),'Name','Please select Group 1 (this is what will be visualized)','ListSize',[500 250]);
-    [comparison(2), ~] = listdlg('ListString',string(groups),'Name','Please select Group 2','ListSize',[500 250]);
+    [comparison(1), ~] = listdlg('ListString',string(groups),'Name','Please select Group 1 (this is what will be visualized)','ListSize',[500 250],'SelectionMode','single');
+    [comparison(2), ~] = listdlg('ListString',string(groups),'Name','Please select Group 2','ListSize',[500 250],'SelectionMode','single');
     
     comp_flip  = 0;
     if comparison(1) > comparison(2)
@@ -123,7 +117,7 @@ if stats_type <= 2
     disp(data_2)
     
     if isequal(stats_type,1)
-        combine_stats = menu('Would you like to combine the statistical analyses?','Yes','No');
+        combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
     end
 
 elseif stats_type == 3 % Group no stats
@@ -139,7 +133,7 @@ elseif stats_type == 4 % Individual no stats
     temp = subj_group.(string(groups)).SubjectList;
     [indx,~] = listdlg('ListString',temp,'Name','Please select participant(s)','ListSize',[500 500]);
 
-    norm_raw = menu('Would you like to see normalized or raw results?','Normalized','Raw');
+    norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
     Bone_Ind = cell(bone_amount,1);
@@ -184,7 +178,7 @@ clear Prompt DefAns Name formats
 
 %% Load .stl Bone File for Plots
 if stats_type < 4
-    MeanShape = cell(bone_amount,1);
+    % MeanShape = cell(bone_amount,1);
     for bone_count = 1:bone_amount
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
         for c = 1:length(S)
@@ -212,7 +206,6 @@ if stats_type < 4
         
         %% Load .particles File for Plots
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.particles')); 
-        MeanCP = cell(bone_amount,1);
         for c = 1:length(S)
             temp = strsplit(S(c).name,'.');
             temp = strrep(temp(1),' ','_');
@@ -291,9 +284,11 @@ elseif stats_type == 4
     end
 end
 
-%% Selecting Viewing Perspective
+%% Selecting Figure Settings
 % Baseline before user changes.
-% Cirlce Color
+view_perspective = [20, 45];
+
+% Circle Color
 circle_color = [1 0 1];
 
 % Glyph size
@@ -310,181 +305,280 @@ colormap_choice = 'jet';
 
 clear Prompt DefAns Name formats Options
 
-if select_perspective == 1
+fprintf('Changing figure settings...\n')
+uiwait(msgbox('It will take time to load the bone and correspondence models, thanks for your patience!'))
+close all
+done_selecting = 0;
 
-    fprintf('Changing figure settings...\n')
-    uiwait(msgbox('It will take time to load the bone and correspondence models when selecting, thanks for your patience!'))
-    close all
-    done_selecting = 0;
+if stats_type == 4
+    g_ind = fieldnames(MeanCP_Ind);
+    MeanCP{1}    = MeanCP_Ind.(string(g_ind(1))){1};
+    MeanShape{1} = MeanShape_Ind.(string(g_ind(1))){1};
+end
 
-    if stats_type == 4
-        g_ind = fieldnames(MeanCP_Ind);
-        MeanCP{1}    = MeanCP_Ind.(string(g_ind(1))){1};
-        MeanShape{1} = MeanShape_Ind.(string(g_ind(1))){1};
+SPMIndex    = cell(1,bone_amount);
+NodalIndex  = cell(1,bone_amount);
+NodalData   = cell(1,bone_amount);
+for bone_count = 1:bone_amount
+    color_map_temp = normrnd(0,1,[1,length(MeanCP{bone_count}(:,1))])';
+    clear t
+    g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
+    gg = fieldnames(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))));
+    for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))).(string(gg(1)))(1,:))
+        temp = find(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))).(string(gg(1)))(:,m) ~= 0);
+        if isempty(temp) == 0
+            t = temp;
+            break
+        end
     end
-    
-    SPMIndex    = cell(1,bone_amount);
-    NodalIndex  = cell(1,bone_amount);
-    NodalData   = cell(1,bone_amount);
-    for bone_count = 1:bone_amount
-        color_map_temp = normrnd(0,1,[1,length(MeanCP{bone_count}(:,1))])';
-        clear t
-        g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
-        gg = fieldnames(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))));
-        for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))).(string(gg(1)))(1,:))
-            temp = find(Bone_Data{bone_count}.DataOut_Mean.(string(g(1))).(string(gg(1)))(:,m) ~= 0);
-            if isempty(temp) == 0
-                t = temp;
-                break
+    SPMIndex{bone_count}    = randi([1 length(t)],1,floor(0.10*length(t)))';
+    NodalIndex{bone_count}  = t;
+    NodalData{bone_count}   = color_map_temp(NodalIndex{bone_count});
+    bone_alph{bone_count}   = 1;
+end
+
+CLimits         = [min(color_map_temp), max(color_map_temp)];
+ColorMap_Flip   = 1;
+set_change      = 1;
+perc_stance     = 0;
+cmap_shift      = 1;
+
+MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
+if isequal(isempty(MF),0)
+    prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
+    fig_set_name = [];
+    if isequal(prev_fig_set,1)
+        fig_set_name = uigetfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\*.mat',data_dir));
+        load(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s',data_dir,fig_set_name));
+        if length(bone_alph) < bone_amount
+            % Bone Transparency, this is in case you are using settings
+            % from a different bone/joint
+            bone_alph = cell(1,bone_amount);
+            for bone_count = 1:bone_amount
+                bone_alph{bone_count} = 1;
             end
         end
-        SPMIndex{bone_count}    = randi([1 length(t)],1,floor(0.10*length(t)))';
-        NodalIndex{bone_count}  = t;
-        NodalData{bone_count}   = color_map_temp(NodalIndex{bone_count});
-        bone_alph{bone_count}   = 1;
     end
+end
 
-    CLimits = [min(color_map_temp), max(color_map_temp)];
-    ColorMap_Flip = 1;
-    set_change = 1;
-    perc_stance = 0;
-    colormap_choice = 'jet';
-    cmap_shift = 1;
-    glyph_trans = [1 1];
+uiwait(msgbox('Correspondence particles are representative of results, but data at the particles are randomly generated for the purpose of visualization for selection of figure settings.'))
+while isequal(set_change,1)
+    close all
+    vis_toggle = 1;
+    RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 
-    while isequal(set_change,1)
-        close all
-        vis_toggle = 1;
-        RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+    set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
+    if isequal(set_change,1)
+        Options.Resize = 'on';
+        Options.Interpreter = 'tex';
 
-        while isequal(done_selecting,0)
-            done_selecting = menu("Select to save viewing perspective","Save");
+        Prompt(1,:)         = {'Glyph Size:','Glyph',[]};
+        DefAns.Glyph        = char(string(glyph_size));  
+        Prompt(2,:)         = {'Ring Color:','Color',[]};
+        formats(2,1).type   = 'color';
+        DefAns.Color        = circle_color;
+
+        Prompt(3,:)         = {'Viewing Perspective:','Perspective',[]};
+        DefAns.Perspective  = sprintf('%s %s',string(view_perspective(1)),string(view_perspective(2))); 
+        Prompt(4,:)         = {'Bone Transparency:','Trans',[]};
+
+        ba = '';
+        for bone_count = 1:bone_amount
+            ba = strcat(strcat(ba,string(bone_alph{bone_count})),'_');                
+        end
+        DefAns.Trans        = char(strrep(ba,'_',' '));
+
+        Prompt(5,:)     = {'Colormap:','CMap',[]};
+        
+        for n = [1 3 4 7]
+            formats(n,1).type   = 'edit';
+            formats(n,1).size = [100 20];                
+        end
+        
+        formats(5,1).type   = 'list';
+        formats(5,1).style  = 'popupmenu';
+        formats(5,1).size = [100 20];
+        if isequal(cmap_shift,1)
+            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
+        end
+        if exist('colormap_choice_new','var') == 0
+            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
+        elseif exist('colormap_choice_new','var') == 1
+            formats(5,1).items{end}     = colormap_choice;
+            formats(5,1).items{end+1}   = 'type in your own';
+        end
+        
+        if isequal(cmap_shift,2)
+            temp = cell(1,1);
+            for y = 1:length(formats(5,1).items)+1
+                if y == 1
+                    temp{y} = char(colormap_choice);
+                else
+                    temp{y} = char(formats(5,1).items{y-1});
+                end
+            end
+            trem = find(string(temp) == char(colormap_choice));
+            temp(trem(2:end)) = [];
+            formats(5,1).items = temp;
+        end
+
+        Prompt(6,:)         = {'Check to capture current viewing perspective','CapPersp',[]};
+        DefAns.CapPersp     = true;
+        formats(6,1).type  = 'check';
+        formats(6,1).size   = [100 20];
+
+        Prompt(7,:)         = {'Glyph Transparency:','GlyphTrans',[]};
+        DefAns.GlyphTrans   = sprintf('%s %s', num2str(glyph_trans(1),'%.2f'), num2str(glyph_trans(2),'%.2f'));
+
+        Prompt(8,:)         = {'Load Figure Settings','LoadFigSet',[]};
+
+        formats(8,1).type   = 'list';
+        formats(8,1).style  = 'popupmenu';
+        formats(8,1).size   = [100 20];
+        if isequal(isempty(MF),0)
+            prev_fig_set    = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir),'*.mat'));
+            formats(8,1).items = {'',prev_fig_set.name};
+        elseif isequal(isempty(MF),1)
+            formats(8,1).items = {''};
+        end
+        DefAns.LoadFigSet   = '';
+
+        Name   = 'Change figure settings';
+        set_inp = inputsdlg(Prompt,Name,formats,DefAns,Options);
+        
+        view_persp_capt =set_inp.CapPersp;
+
+        %%
+        
+        colormap_choice = string(formats(5,1).items(set_inp.CMap));
+        if isequal(set_inp.CMap,length(formats(5,1).items))
+            colormap_choice_new = string(inputdlg({'Type in colormap name:'},'Colormap',[1 30],{char('jet')}));
+            colormap_choice = colormap_choice_new;
+        end            
+        
+        cmap_shift = 2;
+
+        glyph_size   = str2double(set_inp.Glyph);
+
+        circle_color = set_inp.Color;
+
+        vp = string(set_inp.Perspective);
+        vp = strsplit(vp,' ');
+        view_perspective = [str2double(vp(1)) str2double(vp(2))];
+        
+        ba = string(set_inp.Trans);
+        ba = strsplit(ba,' ');
+        for bone_count = 1:bone_amount
+            bone_alph{bone_count} = str2double(ba(bone_count));
+        end
+        
+        gt = string(set_inp.GlyphTrans);
+        gt = strsplit(gt,' ');
+        glyph_trans = [str2double(gt(1)) str2double(gt(2))];
+
+        if set_inp.LoadFigSet > 1
+            fig_set_name = prev_fig_set(set_inp.LoadFigSet-1).name;
+            load(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s',data_dir,fig_set_name));
+            if length(bone_alph) < bone_amount
+                % Bone Transparency, this is in case you are using settings
+                % from a different bone/joint
+                bone_alph = cell(1,bone_amount);
+                for bone_count = 1:bone_amount
+                    bone_alph{bone_count} = 1;
+                end
+            end
+        end
+        if isequal(view_persp_capt,1)
             view_perspective = get(gca,'View');
         end
-        set_change = menu("Change settings?","Yes","No");
-        if isequal(set_change,1)
-            Options.Resize = 'on';
-            Options.Interpreter = 'tex';
-
-            Prompt(1,:)         = {'Glyph Size:','Glyph',[]};
-            DefAns.Glyph        = char(string(glyph_size));  
-            Prompt(2,:)         = {'Ring Color (RGB):','Color',[]};
-            formats(2,1).type   = 'color';
-            DefAns.Color        = circle_color;%sprintf('%s %s %s',string(circle_color(1)),string(circle_color(2)),string(circle_color(3)));;
-
-            Prompt(3,:)         = {'Viewing Perspective:','Perspective',[]};
-            DefAns.Perspective  = sprintf('%s %s',string(view_perspective(1)),string(view_perspective(2))); 
-            Prompt(4,:)         = {'Bone Transparency:','Trans',[]};
-
-            ba = '';
-            for bone_count = 1:bone_amount
-                ba = strcat(strcat(ba,string(bone_alph{bone_count})),'_');                
-            end
-            DefAns.Trans        = char(strrep(ba,'_',' '));
-
-            Prompt(5,:)     = {'Colormap:','CMap',[]};
-            
-            for n = [1 3 4 6]
-                formats(n,1).type   = 'edit';
-                formats(n,1).size = [100 20];                
-            end
-            
-            formats(5,1).type   = 'list';
-            formats(5,1).style  = 'popupmenu';
-            if isequal(cmap_shift,1)
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
-            end
-            if exist('colormap_choice_new','var') == 0
-                formats(5,1).items  = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
-            elseif exist('colormap_choice_new','var') == 1
-                formats(5,1).items{end} = colormap_choice;
-                formats(5,1).items{end+1} = 'type in your own';
-            end
-            
-            if isequal(cmap_shift,2)
-                temp = cell(1,1);
-                for y = 1:length(formats(5,1).items)+1
-                    if y == 1
-                        temp{y} = char(colormap_choice);
-                    else
-                        temp{y} = char(formats(5,1).items{y-1});
-                    end
-                end
-                trem = find(string(temp) == char(colormap_choice));
-                temp(trem(2:end)) = [];
-                formats(5,1).items = temp;
-            end
-
-            Prompt(6,:)         = {'Glyph Transparency:','GlyphTrans',[]};
-            DefAns.GlyphTrans   = sprintf('%s %s', num2str(glyph_trans(1),'%.2f'), num2str(glyph_trans(2),'%.2f')); 
-            
-            Name   = 'Change figure settings';
-            set_inp = inputsdlg(Prompt,Name,formats,DefAns,Options);
-            
-            colormap_choice = string(formats(5,1).items(set_inp.CMap));
-            if isequal(set_inp.CMap,length(formats(5,1).items))
-                colormap_choice_new = string(inputdlg({'Type in colormap name:'},'Colormap',[1 30],{char('jet')}));
-                colormap_choice = colormap_choice_new;
-            end            
-            
-            cmap_shift = 2;
-
-            glyph_size = str2double(set_inp.Glyph);
-
-            circle_color = set_inp.Color;
-
-            vp = string(set_inp.Perspective);
-            vp = strsplit(vp,' ');
-            view_perspective = [str2double(vp(1)) str2double(vp(2))];
-            
-            ba = string(set_inp.Trans);
-            ba = strsplit(ba,' ');
-            for bone_count = 1:bone_amount
-                bone_alph{bone_count} = str2double(ba(bone_count));
-            end
-            
-            gt = string(set_inp.GlyphTrans);
-            gt = strsplit(gt,' ');
-            glyph_trans = [str2double(gt(1)) str2double(gt(2))];
-        end
     end
-    close all
-    fprintf('Viewing Perspective:\n')
-    disp(view_perspective)
 end
+
+%% Saving Figure Settings
+if isequal(set_change,3)
+    OutputSettings.view_perspective = view_perspective;
+    OutputSettings.bone_alph        = bone_alph;
+    OutputSettings.colormap_choice  = colormap_choice;
+    OutputSettings.circle_color     = circle_color; 
+    OutputSettings.glyph_size       = glyph_size;
+    OutputSettings.glyph_trans      = glyph_trans;
+    OutputSettings.vis_toggle       = vis_toggle;
+
+    if isequal(isempty(fig_set_name),1)
+        fig_set_name = 'Default';
+    elseif isequal(isempty(fig_set_name),0)
+        fig_set_name = strrep(fig_set_name,'.mat','');
+    end
+
+    settings_name = inputdlg({'Enter name for figure settings: (if same name will overwrite)'},...
+        'Figure Settings Filename',[1 100],{fig_set_name});
+    
+    MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
+    if isempty(MF) == 1
+        mkdir(sprintf('%s\\Outputs\\JMA_03_Outputs',data_dir))
+    end
+    save(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s.mat',data_dir,settings_name{1}),'-struct','OutputSettings');
+end
+close all
 
 %% Limit Selection
 fprintf('Selecting Limits...\n')
 g = fieldnames(Bone_Data{1}.DataOut);
 listname = cell(1,length(inpdata));
 listdata = cell(1,length(inpdata));
-for n = inpdata
-    listname{1,n} = char(g(n));
-    clear U_temp
-    mcomp = [];
-    for b = 1:bone_amount
-        mcomp(:,end+1) = Bone_Data{b}.DataOutAll.(string(g(n)));
-    end   
-    listdata{n} = char(sprintf('%s %s',num2str(mean(mcomp)-std(mcomp)*2,'%.2f'),num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
-    if isequal(lower(string(g(n))),'distance')
-        listdata{1,n} = char(sprintf('%d %d',0,6));
-    elseif isequal(lower(string(g(n))),'congruence')
-        listdata{1,n} = char(sprintf('%d %s',0,num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
+if isequal(colormap_choice,"difference")
+    for n = inpdata
+        listname{1,n} = char(g(n));
+        clear U_temp
+        
+        A = cell(bone_amount,1);
+        max_diff = zeros(bone_amount,1);
+        min_diff = max_diff;
+        for b = 1:bone_amount
+            A{b} = zeros(length(Bone_Data{b}.DataOut_Mean.(string(g(n))).(data_1)),1);
+        end
+        for b = 1:bone_amount
+            for diff_count = 1:length(A{b})
+                if Bone_Data{b}.DataOut_Mean.(string(g(n))).(data_1)(diff_count,1) <= 6 && Bone_Data{b}.DataOut_Mean.(string(g(n))).(data_2)(diff_count,1) <= 6
+                    A{b}(diff_count,:) = Bone_Data{b}.DataOut_Mean.(string(g(n))).(data_1)(diff_count,1)-Bone_Data{b}.DataOut_Mean.(string(g(n))).(data_2)(diff_count,1);
+                end
+            end
+            max_diff(b) = max(A{b});
+            min_diff(b) = min(A{b});
+        end   
+        listdata{n} = char(sprintf('%s %s',num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
+        listname{1,n} = char(sprintf('%s (min = %s , max = %s)',listname{1,n},num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
     end
-    listname{1,n} = char(sprintf('%s (%s \x00B1 %s)',listname{1,n},num2str(mean(mcomp),'%.2f'),num2str(std(mcomp)*2,'%.2f')));
+else
+    for n = inpdata
+        listname{1,n} = char(g(n));
+        clear U_temp
+        
+        mcomp = [];
+        for b = 1:bone_amount
+            mcomp = [mcomp; Bone_Data{b}.DataOutAll.(string(g(n)))];
+        end   
+        listdata{n} = char(sprintf('%s %s',num2str(mean(mcomp)-std(mcomp)*2,'%.2f'),num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
+        if isequal(lower(string(g(n))),'distance')
+            listdata{1,n} = char(sprintf('%d %d',0,6));
+        elseif isequal(lower(string(g(n))),'congruence')
+            listdata{1,n} = char(sprintf('%d %s',0,num2str(mean(mcomp)+std(mcomp)*2,'%.2f')));
+        end
+        listname{1,n} = char(sprintf('%s (%s \x00B1 %s)',listname{1,n},num2str(mean(mcomp),'%.2f'),num2str(std(mcomp)*2,'%.2f')));
+    end    
 end
 
 clear Prompt DefAns Name formats
 k = 1;
-Prompt = cell(length(inpdata)+1,1);
+Prompt = {};
 for n = [inpdata inpdata(end)+1]
     if n <= inpdata(end)
-        Prompt(n,:)                         = {sprintf('%s',listname{1,n},blanks(30-length(listname{1,n}))),sprintf('A%d',k),[]};
+        Prompt(end+1,:)                         = {sprintf('%s',listname{1,n},blanks(30-length(listname{1,n}))),sprintf('A%d',k),[]};
         DefAns.(sprintf('A%d',k))               = char(string(listdata{1,n}));
         formats(k,1).type                       = 'edit';
-        formats(k,1).size                       = [200-length(char(string(listdata{1,n}))) 20]; 
+        formats(k,1).size                       = [200-length(char(string(listdata{1,n}))) 20];
         k = k + 1;
-        Prompt(n,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
+        Prompt(end+1,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
         formats(k,2).type                       = 'check';
         if isequal(lower(string(g(n))),'distance')
             DefAns.(sprintf('A%d',k))           = true;
@@ -494,7 +588,7 @@ for n = [inpdata inpdata(end)+1]
         k = k + 1;
     elseif n > inpdata(end)
         limitname = 'Set distance limits for removing particles from analysis:';
-        Prompt(n,:)                         = {sprintf('%s',limitname,blanks(30-length(limitname))),sprintf('A%d',k),[]};
+        Prompt(end+1,:)                         = {sprintf('%s',limitname,blanks(30-length(limitname))),sprintf('A%d',k),[]};
         DefAns.(sprintf('A%d',k))               = '0 6';
         formats(k,1).type                       = 'edit';
         formats(k,1).size                       = [100-length(limitname) 20];
@@ -525,6 +619,7 @@ Distance_Upper = str2double(cell2mat(temp(2)));
 Distance_Lower = str2double(cell2mat(temp(1)));
 
 fprintf('Processing...\n')
+
 %% ANOVA or t-Tests
 if isequal(stats_type,1)
     %% Find number of Correspondence Particles
@@ -951,8 +1046,7 @@ if stats_type == 3
                     tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                         ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
                         string(plot_data_name(plot_data)),data_1{1});
-        
-        
+    
                 if n == 1
                     disp(tif_folder)
                     fprintf('%s: \n',data_1{1})
@@ -973,10 +1067,9 @@ if stats_type == 3
                     NodalIndex{bone_count}  = {};
                     NodalData{bone_count}   = {};
                     SPM_index{bone_count}   = [];
+
                     k = 1;
-                    
                     for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(data_1{1})(:,1))
-        
                         data_cons1 = [];
                         datd_cons1 = [];
                         ss = 1;

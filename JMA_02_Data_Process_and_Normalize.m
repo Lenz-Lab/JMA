@@ -15,14 +15,36 @@
 clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 
-%% Select Folders
-inp_ui = inputdlg({'Enter name of bone that data will be mapped to:','Enter name of opposite bone:','Enter Number of study groups:','Would you like to troubleshoot? (No = 0, Yes = 1)'},'User Inputs',[1 100],{'Calcaneus','Talus','1','0'});
+%% User Inputs
+Options.Resize = 'on';
+Options.Interpreter = 'tex';
 
-bone_names = {inp_ui{1},inp_ui{2}};
+Prompt(1,:)             = {'Enter name of the bone that data will be mapped to (visualized on):','Bone1',[]};
+DefAns.Bone1            = 'Calcaneus';
+formats(1,1).type       = 'edit';
+formats(1,1).size       = [100 20];
 
-study_num  = inp_ui{3};
+Prompt(2,:)             = {'Enter name of opposite bone:','Bone2',[]};
+DefAns.Bone2            = 'Talus';
+formats(2,1).type       = 'edit';
+formats(2,1).size       = [100 20];
 
-troubleshoot_mode = str2double(inp_ui{4});
+Prompt(3,:)             = {'Enter number of study groups:','GrpCount',[]};
+DefAns.GrpCount         = '1';
+formats(3,1).type       = 'edit';
+formats(3,1).size       = [100 20];
+
+Prompt(4,:)             = {'Troubleshoot? (verify correspondence particles)','TrblShoot',[]};
+DefAns.TrblShoot        = false;
+formats(4,1).type       = 'check';
+formats(4,1).size       = [100 20];
+
+
+set_inp = inputsdlg(Prompt,'User Inputs',formats,DefAns,Options);
+
+bone_names = {set_inp.Bone1,set_inp.Bone2};
+study_num = str2double(set_inp.GrpCount);
+troubleshoot_mode = set_inp.TrblShoot;
 
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
@@ -31,16 +53,16 @@ addpath(sprintf('%s\\Mean_Models',data_dir))
 addpath(data_dir)
 
 %% Selecting Data
-fldr_name = cell(str2double(study_num),1);
-for n = 1:str2double(study_num)
-    uiwait(msgbox(sprintf('Please select the %d study group',n)))
+fldr_name = cell(study_num,1);
+for n = 1:study_num
+    uiwait(msgbox(sprintf('Please select study group: %d (of %d)',n,study_num)))
     fldr_name{n} = uigetdir(data_dir);
     addpath(fldr_name{n})
 end
 
 %% Loading Data
 fprintf('Loading Data:\n')
-for n = 1:str2double(study_num)
+for n = 1:study_num
     D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
     
     m = 1;
@@ -106,7 +128,7 @@ if troubleshoot_mode == 1
         camlight(0,0)
         title(strrep(subjects{subj_count},'_',' '))
     end
-    uiwait(msgbox({'Please check and make sure that their are correspondence particles cirlced in blue in the correct joint of interest (only one time step!)','','       Do not select OK until you are ready to move on!'}))
+    uiwait(msgbox({'Please check and make sure that there are correspondence particles circled in blue in the correct joint of interest (only one time step!)','','       Do not select OK until you are ready to move on!'}))
     q = questdlg({'Are there particles circled in blue in the correct joint/area?','Yes to continue troubleshooting (will proceed)','No to abort script (will stop)','Cancel to stop troubleshooting (will proceed)'});
     if isequal(q,'No')
         error('Aborted running the script! Please double check that your kinematics .txt files, bone model .stl files, OR correspondence particles .particles files are correct when you ran JMA_01')

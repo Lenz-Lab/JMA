@@ -668,11 +668,11 @@ if isequal(stats_type,1)
                         if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                             if n == 1 && m == 1
-                                fprintf('Mann-Whitney t-Test or Wilcoxon Rank Sum Test\n')
+                                fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
                             end
                             test_type = 1;
                             [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
-                            % mann-whitney t-test
+                            % Student's t-test
                             % Wilcoxon rank sum test
                             [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
                             

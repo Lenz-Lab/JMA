@@ -343,10 +343,10 @@ set_change      = 1;
 perc_stance     = 0;
 cmap_shift      = 1;
 
+fig_set_name = [];
 MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
 if isequal(isempty(MF),0)
     prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
-    fig_set_name = [];
     if isequal(prev_fig_set,1)
         fig_set_name = uigetfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\*.mat',data_dir));
         load(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s',data_dir,fig_set_name));

@@ -1,4 +1,4 @@
-%% Joint Measurement Analysis #3 - ANOVA Analysis
+%% Joint Measurement Analysis #3 - Statistical Analyses
 % Statistical analysis (normality testing, t-test, or ANOVA) and create 
 % .tif files for stitching videos.
 

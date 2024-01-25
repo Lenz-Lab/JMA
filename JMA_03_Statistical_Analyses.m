@@ -289,7 +289,7 @@ end
 view_perspective = [20, 45];
 
 % Circle Color
-circle_color = [1 0 1];
+circle_color = [4/5 0 4/5];
 
 % Glyph size
 glyph_size = 1;
@@ -301,7 +301,7 @@ for bone_count = 1:bone_amount
     bone_alph{bone_count} = 1;
 end
 % Colormap
-colormap_choice = 'jet';
+colormap_choice = 'arctic';
 
 clear Prompt DefAns Name formats Options
 
@@ -331,7 +331,7 @@ for bone_count = 1:bone_amount
             break
         end
     end
-    SPMIndex{bone_count}    = randi([1 length(t)],1,floor(0.10*length(t)))';
+    SPMIndex{bone_count}    = randi([1 length(t)],1,floor(0.25*length(t)))';
     NodalIndex{bone_count}  = t;
     NodalData{bone_count}   = color_map_temp(NodalIndex{bone_count});
     bone_alph{bone_count}   = 1;
@@ -365,7 +365,7 @@ uiwait(msgbox('Correspondence particles are representative of results, but data 
 while isequal(set_change,1)
     close all
     vis_toggle = 1;
-    RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+    RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 
     set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
     if isequal(set_change,1)
@@ -446,14 +446,14 @@ while isequal(set_change,1)
         Name   = 'Change figure settings';
         set_inp = inputsdlg(Prompt,Name,formats,DefAns,Options);
         
-        view_persp_capt =set_inp.CapPersp;
+        view_persp_capt = set_inp.CapPersp;
 
         %%
         
         colormap_choice = string(formats(5,1).items(set_inp.CMap));
-        if isequal(set_inp.CMap,length(formats(5,1).items))
-            colormap_choice_new = string(inputdlg({'Type in colormap name:'},'Colormap',[1 30],{char('jet')}));
-            colormap_choice = colormap_choice_new;
+        if isequal(colormap_choice,"type in your own")
+        % if isequal(set_inp.CMap,length(formats(5,1).items))
+            colormap_choice = string(inputdlg({'Input Colormap Name:'},'Colormap',[1 50],{''}));
         end            
         
         cmap_shift = 2;
@@ -580,11 +580,12 @@ for n = [inpdata inpdata(end)+1]
         k = k + 1;
         Prompt(end+1,:)                         = {'Flip colormap?',sprintf('A%d',k),[]};
         formats(k,2).type                       = 'check';
-        if isequal(lower(string(g(n))),'distance')
-            DefAns.(sprintf('A%d',k))           = true;
-        else
-            DefAns.(sprintf('A%d',k))           = false;
-        end
+        DefAns.(sprintf('A%d',k))               = false;
+        % if isequal(lower(string(g(n))),'distance')
+        %     DefAns.(sprintf('A%d',k))           = true;
+        % else
+        %     DefAns.(sprintf('A%d',k))           = false;
+        % end
         k = k + 1;
     elseif n > inpdata(end)
         limitname = 'Set distance limits for removing particles from analysis:';
@@ -1006,11 +1007,10 @@ if stats_type < 3
             CLimits = [L U];
             vis_toggle = 0;
             if isempty(NodalData{1}) == 0
-                fprintf('%d\n',n)
-                figure()    
-                RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                fprintf('%d\n',n)    
+                RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                     ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle);
     
                 saveas(gcf,sprintf('%s\\%s_vs_%s_%d.tif',tif_folder,string(groups(comparison(1))),string(groups(comparison(2))),n));
                 N_length = [N_length n];
@@ -1101,7 +1101,7 @@ if stats_type == 3
                 if isempty(NodalData{1}) == 0
                     fprintf('%s\n',string(n))
                     figure()    
-                    RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                    RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                         ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
                         view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
         
@@ -1190,7 +1190,7 @@ if stats_type == 4
                     if isempty(NodalData{1}) == 0
                         fprintf('%s\n',string(n))
                         figure()    
-                        RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                        RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                             ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
                             view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
             

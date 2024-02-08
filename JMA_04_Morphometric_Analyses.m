@@ -19,7 +19,7 @@ alpha_val = 0.05;
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
 
-uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
+uiwait(msgbox({'Please select the .mat file with the normalized data';'There will be another prompt but it will take time to load!'}));
 
 addpath(sprintf('%s\\Mean_Models',data_dir))
 
@@ -165,6 +165,7 @@ for grp_count = 1:2
     end   
 end
 
+clear Bone_Data
 %%
 
 delete(gcp('nocreate'))
@@ -191,7 +192,7 @@ end
 %%
 NodalIndex{1}       = (1:length(MeanCP{1}(:,1)))';
 
-cl = round(max(abs([min(NodalData{1}) max(NodalData{1})])),1,TieBreaker = 'plusinf');
+cl = round(max(abs([min(NodalData) max(NodalData)])),1,TieBreaker = 'plusinf');
 view_perspective = [20 45];
 
 %% User Inputs
@@ -204,7 +205,7 @@ DefAns.CLimits      = sprintf('%s %s',string(-cl),string(cl));
 formats(1,1).type   = 'edit';
 formats(1,1).size   = [100 20];
 
-Prompt(2,:)         = {'Glyph Size (%): ','Glyph',[]};
+Prompt(2,:)         = {'Glyph Size (scalar): ','Glyph',[]};
 DefAns.Glyph        = char(string(1));
 
 Prompt(3,:)         = {'Viewing Perspective: ','Perspective',[]};
@@ -356,10 +357,10 @@ SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 %%
 if incl_dist
     stats_type = 1;
-    Figure_Out{1} = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool);
+    Figure_Out  = RainbowFish_Morph1(MeanCP,MeanShape{1},SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool);
 elseif ~incl_dist
     stats_type = 2;
-    Figure_Out = RainbowFish_Morph2(MeanCP,SPMIndex,circle_color,glyph_size,pool);
+    Figure_Out  = RainbowFish_Morph2(MeanCP,SPMIndex,circle_color,glyph_size,pool);
 end
 
 %%

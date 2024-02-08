@@ -356,7 +356,7 @@ SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 %%
 if incl_dist
     stats_type = 1;
-    Figure_Out = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool);
+    Figure_Out{1} = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool);
 elseif ~incl_dist
     stats_type = 2;
     Figure_Out = RainbowFish_Morph2(MeanCP,SPMIndex,circle_color,glyph_size,pool);

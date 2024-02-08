@@ -37,6 +37,7 @@ function [Figure_Out]  = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_col
 % Date: 
 
 %% Create Bin Structure
+clear S
 % Colors
 color_palette = [1/2 0 0;   % Deep red
                  1 0 0;     % Red
@@ -102,6 +103,9 @@ end
 % Parallel for loop takes each data point from NodalData and pairs the index 
 % it with a ColorMap2 value (CMap output variable) using the previously
 % created bins
+
+% Need to figure out how to make it work with multiple bones.....
+% bone_amount = length(NodalData);
 CMap = zeros(length(MeanCP{1}(:,1)),3);
 for n = 1:length(NodalData(:,1))
     k = 1;
@@ -151,9 +155,9 @@ Disc.vertices   = TT.Points*1.2*glyph_size;
 
 pool.IdleTimeout = 30;
 
-bone_count = 1;
-bone_center = incenter(MeanShape{bone_count});
-bone_normal = faceNormal(MeanShape{bone_count});
+
+bone_center = incenter(MeanShape);
+bone_normal = faceNormal(MeanShape);
 
 Bead_All_vertices   = cell(length(MeanCP{1}),1);
 Bead_All_faces      = cell(length(MeanCP{1}),1);

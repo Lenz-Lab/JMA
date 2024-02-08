@@ -15,6 +15,11 @@
 clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 
+delete(gcp('nocreate'))
+pool = parpool([1 100]);
+clc
+pool.IdleTimeout = 60;
+
 %% User Inputs
 stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
 
@@ -153,7 +158,7 @@ elseif stats_type == 4 % Individual no stats
                 for d = 1:length(temp)
                     bone_c1  = isequal(lower(string(bone_names(1))),lower(string(temp(d))));
                     bone_c2  = isequal(lower(string(bone_names(2))),lower(string(temp(d))));
-                    group_c = isequal(lower(data_1(subj_count)),lower(string(temp(d))));
+                    group_c  = isequal(lower(groups{1}),lower(string(temp(d))));
                     if isequal(bone_c1,1)
                         bone_check1 = 1;
                     end
@@ -303,6 +308,8 @@ end
 % Colormap
 colormap_choice = 'arctic';
 
+incl_dist = true;
+
 clear Prompt DefAns Name formats Options
 
 fprintf('Changing figure settings...\n')
@@ -343,6 +350,9 @@ set_change      = 1;
 perc_stance     = 0;
 cmap_shift      = 1;
 
+bone_color = [0.85 0.85 0.85];
+bead_color = [0.85 0.85 0.85];
+
 fig_set_name = [];
 MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
 if isequal(isempty(MF),0)
@@ -361,20 +371,33 @@ if isequal(isempty(MF),0)
     end
 end
 
+BoneSTL.faces       = MeanShape{1}.ConnectivityList;
+BoneSTL.vertices    = MeanShape{1}.Points;
+
 uiwait(msgbox('Correspondence particles are representative of results, but data at the particles are randomly generated for the purpose of visualization for selection of figure settings.'))
 while isequal(set_change,1)
     close all
     vis_toggle = 1;
-    RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+    % RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+
+    RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
+
+
+
 
     set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
     if isequal(set_change,1)
+        clear Prompt formats DefAns
         Options.Resize = 'on';
         Options.Interpreter = 'tex';
 
         Prompt(1,:)         = {'Glyph Size:','Glyph',[]};
-        DefAns.Glyph        = char(string(glyph_size));  
-        Prompt(2,:)         = {'Ring Color:','Color',[]};
+        DefAns.Glyph        = char(string(glyph_size));
+        if incl_dist
+            Prompt(2,:)         = {'Significance Ring Color:','Color',[]};
+        elseif ~incl_dist
+            Prompt(2,:)         = {'Significance Bead Color:','Color',[]};
+        end
         formats(2,1).type   = 'color';
         DefAns.Color        = circle_color;
 
@@ -443,13 +466,33 @@ while isequal(set_change,1)
         end
         DefAns.LoadFigSet   = '';
 
+        Prompt(9,:)         = {'Include data maps?','DistMap',[]};
+        DefAns.DistMap      = incl_dist;
+        formats(9,1).type   = 'check';
+        formats(9,1).size   = [100 20];
+
+        Prompt(10,:)         = {'Bone Color:','BoneColor',[]};
+        formats(10,1).type   = 'color';
+        DefAns.BoneColor     = bone_color;        
+        
+        if ~incl_dist
+            Prompt(11,:)         = {'Non-Significant Bead Color:','NonColor',[]};
+            formats(11,1).type   = 'color';
+            DefAns.NonColor      = bead_color;  
+        end
+
         Name   = 'Change figure settings';
         set_inp = inputsdlg(Prompt,Name,formats,DefAns,Options);
         
         view_persp_capt = set_inp.CapPersp;
 
         %%
-        
+        if ~incl_dist
+            bead_color = set_inp.NonColor;
+        end
+
+        bone_color = set_inp.BoneColor;
+
         colormap_choice = string(formats(5,1).items(set_inp.CMap));
         if isequal(colormap_choice,"type in your own")
         % if isequal(set_inp.CMap,length(formats(5,1).items))
@@ -475,6 +518,8 @@ while isequal(set_change,1)
         gt = string(set_inp.GlyphTrans);
         gt = strsplit(gt,' ');
         glyph_trans = [str2double(gt(1)) str2double(gt(2))];
+
+        incl_dist = set_inp.DistMap;
 
         if set_inp.LoadFigSet > 1
             fig_set_name = prev_fig_set(set_inp.LoadFigSet-1).name;
@@ -503,6 +548,7 @@ if isequal(set_change,3)
     OutputSettings.glyph_size       = glyph_size;
     OutputSettings.glyph_trans      = glyph_trans;
     OutputSettings.vis_toggle       = vis_toggle;
+    OutputSettings.incl_dist        = incl_dist;
 
     if isequal(isempty(fig_set_name),1)
         fig_set_name = 'Default';
@@ -668,6 +714,7 @@ if isequal(stats_type,1)
         
                         if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
+                            %% Student's t-Test or Wilcoxon Rank Sum
                             if n == 1 && m == 1
                                 fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
                             end
@@ -676,10 +723,24 @@ if isequal(stats_type,1)
                             % Student's t-test
                             % Wilcoxon rank sum test
                             [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
-                            
+
                             if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
                                 NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
                             end
+
+                            %% Hotelling's T2 Test
+                            % if n == 1 && m == 1
+                            %     fprintf('Multivariate Hotelling''s T^2 Test\n')
+                            % end
+                            % clear data
+                            % data{1} = statdata.(data_1);
+                            % data{2} = statdata.(data_2);
+                            % p_value = HotellingT2_1D(data,pool);
+                            % 
+                            % if isempty(p_value) == 0
+                            %     NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value, 1, norm_test(8,3)];% Shapiro-Wilk Normality test
+                            % end
+
                         elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
                             if isempty(data_all) == 0 && isempty(agrp_id) == 0
@@ -1008,9 +1069,9 @@ if stats_type < 3
             vis_toggle = 0;
             if isempty(NodalData{1}) == 0
                 fprintf('%d\n',n)    
-                RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                     ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle);
+                    view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color);
     
                 saveas(gcf,sprintf('%s\\%s_vs_%s_%d.tif',tif_folder,string(groups(comparison(1))),string(groups(comparison(2))),n));
                 N_length = [N_length n];
@@ -1101,9 +1162,9 @@ if stats_type == 3
                 if isempty(NodalData{1}) == 0
                     fprintf('%s\n',string(n))
                     figure()    
-                    RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                    RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                         ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
         
                     saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,data_1{1},n));
                     N_length = [N_length n];
@@ -1190,9 +1251,9 @@ if stats_type == 4
                     if isempty(NodalData{1}) == 0
                         fprintf('%s\n',string(n))
                         figure()    
-                        RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                        RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
                             ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
-                            view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
+                            view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
             
                         saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,string(data_1(subj_count)),n));
                         N_length = [N_length n];

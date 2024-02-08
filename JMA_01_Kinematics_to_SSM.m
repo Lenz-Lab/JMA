@@ -42,7 +42,7 @@
 % (Name).xlsx       -> [first tracked frame, heel-strike frame , toe-off frame, last tracked frame]
 %   This file is used for normalizing the events to percentage of stance
 % 
-% (Bone_Name_#).txt -> [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 0, 0, 0, 0, 0, 1] (each line is a frame)
+% (Bone_Name_#).txt -> [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1] (each line is a frame)
 %   This file contains the 4x4 transformation matrices. The above identity 
 %   matrix example shows how for one frame the matrix is changed for every 
 %   four delimited values are a row of the transformation matrix.
@@ -489,9 +489,7 @@ for group_count = 1:length(groups)
     for subj_count = 1:length(subjects) 
         fprintf('   %s:\n',subjects{subj_count})
         frame_start = 1;
-        for bone_count = 1:length(bone_names)
-            kine_data_length = Data.(subjects{subj_count}).(bone_names{bone_count}).Kinematics;
-        end
+        kine_data_length = Data.(subjects{subj_count}).(bone_names{1}).Kinematics;
         
         clear temp
         M = dir(fullfile(sprintf('%s\\%s\\%s\\%s',data_dir,groups{group_count},subjects{subj_count}),'*mat'));

@@ -1,6 +1,6 @@
 %% Joint Measurement Analysis #2 - Data Process and Normalization
 % Normalizes and truncates data to consistent percentages of stance for
-% data measured from the DJMA_01_Kinematics_to_SSM.m script.
+% data measured from the JMA_01_Kinematics_to_SSM.m script.
 
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group

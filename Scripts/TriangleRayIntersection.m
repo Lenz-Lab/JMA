@@ -3,7 +3,7 @@ function [intersect, t, u, v, xcoor] = TriangleRayIntersection (...
 %TRIANGLERAYINTERSECTION Ray/triangle intersection.
 %    INTERSECT = TriangleRayIntersection(ORIG, DIR, VERT1, VERT2, VERT3) 
 %      calculates ray/triangle intersections using the algorithm proposed
-%      BY MÃ¶ller and Trumbore (1997), implemented as highly vectorized 
+%      BY Möller and Trumbore (1997), implemented as highly vectorized 
 %      MATLAB code. The ray starts at ORIG and points toward DIR. The 
 %      triangle is defined by vertix points: VERT1, VERT2, VERT3. All input  
 %      arrays are in Nx3 or 1x3 format, where N is number of triangles or 
@@ -66,7 +66,7 @@ function [intersect, t, u, v, xcoor] = TriangleRayIntersection (...
 %  have to be cloned to have the right size. Use "repmat(A,size(B,1),1)".
 %
 % Based on:
-%  *"Fast, minimum storage ray-triangle intersection". Tomas MÃ¶ller and
+%  *"Fast, minimum storage ray-triangle intersection". Tomas Möller and
 %    Ben Trumbore. Journal of Graphics Tools, 2(1):21--28, 1997.
 %    http://www.graphics.cornell.edu/pubs/1997/MT97.pdf
 %  * http://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
@@ -76,12 +76,14 @@ function [intersect, t, u, v, xcoor] = TriangleRayIntersection (...
 %    Jarek Tuszynski (jaroslaw.w.tuszynski@leidos.com)
 %
 % License: BSD license (http://en.wikipedia.org/wiki/BSD_licenses)
+
 %% Transpose inputs if needed
 if (size(orig ,1)==3 && size(orig ,2)~=3), orig =orig' ; end
 if (size(dir  ,1)==3 && size(dir  ,2)~=3), dir  =dir'  ; end
 if (size(vert0,1)==3 && size(vert0,2)~=3), vert0=vert0'; end
 if (size(vert1,1)==3 && size(vert1,2)~=3), vert1=vert1'; end
 if (size(vert2,1)==3 && size(vert2,2)~=3), vert2=vert2'; end
+
 %% In case of single points clone them to the same size as the rest
 N = max([size(orig,1), size(dir,1), size(vert0,1), size(vert1,1), size(vert2,1)]);
 if (size(orig ,1)==1 && N>1 && size(orig ,2)==3), orig  = repmat(orig , N, 1); end
@@ -89,6 +91,7 @@ if (size(dir  ,1)==1 && N>1 && size(dir  ,2)==3), dir   = repmat(dir  , N, 1); e
 if (size(vert0,1)==1 && N>1 && size(vert0,2)==3), vert0 = repmat(vert0, N, 1); end
 if (size(vert1,1)==1 && N>1 && size(vert1,2)==3), vert1 = repmat(vert1, N, 1); end
 if (size(vert2,1)==1 && N>1 && size(vert2,2)==3), vert2 = repmat(vert2, N, 1); end
+
 %% Check if all the sizes match
 SameSize = (any(size(orig)==size(vert0)) && ...
   any(size(orig)==size(vert1)) && ...
@@ -96,6 +99,7 @@ SameSize = (any(size(orig)==size(vert0)) && ...
   any(size(orig)==size(dir  )) );
 assert(SameSize && size(orig,2)==3, ...
   'All input vectors have to be in Nx3 format.');
+
 %% Read user preferences
 eps        = 1e-5;
 planeType  = 'two sided';
@@ -134,6 +138,7 @@ else
     k = k+1;
   end
 end
+
 %% Set up border parameter
 switch border
   case 'normal'
@@ -145,10 +150,12 @@ switch border
   otherwise
     error('Border parameter must be either "normal", "inclusive" or "exclusive"')
 end
+
 %% initialize default output
 intersect = false(size(orig,1),1); % by default there are no intersections
 t = inf+zeros(size(orig,1),1); u=t; v=t;
 xcoor = nan+zeros(size(orig));
+
 %% Find faces parallel to the ray
 edge1 = vert1-vert0;          % find vectors for two edges sharing vert0
 edge2 = vert2-vert0;
@@ -164,6 +171,7 @@ switch planeType
     error('Triangle parameter must be either "one sided" or "two sided"');
 end
 if all(~angleOK), return; end % if all parallel than no intersections
+
 %% Different behavior depending on one or two sided triangles
 det(~angleOK) = nan;              % change to avoid division by zero
 u    = sum(tvec.*pvec,2)./det;    % 1st barycentric coordinate
@@ -191,6 +199,7 @@ else
   % test if line/plane intersection is within the triangle
   ok = (ok & v>=-zero & u+v<=1.0+zero);
 end
+
 %% Test where along the line the line/plane intersection occurs
 switch lineType
   case 'line'      % infinite line
@@ -202,6 +211,7 @@ switch lineType
   otherwise
     error('lineType parameter must be either "line", "ray" or "segment"');
 end
+
 %% calculate intersection coordinates if requested
 if (nargout>4)
   ok = intersect | fullReturn;

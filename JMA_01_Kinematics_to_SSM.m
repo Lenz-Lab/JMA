@@ -820,7 +820,6 @@ for group_count = 1:length(groups)
             end
             
             %% Calculate Distance and Congruence Index
-            % tic
             tol = ROI_threshold1;
 
             % Pair nodes with CP and calculate euclidean distance
@@ -830,22 +829,30 @@ for group_count = 1:length(groups)
             for h = 1:length(tri_points(:,1))
                 % Kept the line below for legacy
                 ROI = find(bone_STL2.Points(:,1) >= bone_STL1.Points(tri_points(h),1)-tol & bone_STL2.Points(:,1) <= bone_STL1.Points(tri_points(h),1)+tol & bone_STL2.Points(:,2) >= bone_STL1.Points(tri_points(h),2)-tol & bone_STL2.Points(:,2) <= bone_STL1.Points(tri_points(h),2)+tol & bone_STL2.Points(:,3) >= bone_STL1.Points(tri_points(h),3)-tol & bone_STL2.Points(:,3) <= bone_STL1.Points(tri_points(h),3)+tol);
-                if isempty(ROI) == 0
-                    parfor (n = 1:length(ROI(:,1)),pool)
-                        temp(n,:) = pdist2(bone_STL1.Points(tri_points(h),:),bone_STL2.Points(ROI(n),:),'euclidean');
-                    end
-                tempp = ROI(temp(:) == min(temp));
-                i_CP = Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(find(tri_points(h,1) == Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(:,2)),1);
-
-                i_surf(k,:) = [i_CP(1) tri_points(h,1) tempp(1) min(temp) 0];
-            %     tempp(1) == the index of the paired node on the opposing bone surface
-                k = k + 1;
+                if ~isempty(ROI)
+                    temp = pdist2(bone_STL1.Points(tri_points(h),:),bone_STL2.Points(ROI,:),'euclidean');
+    
+                    tempp = ROI(temp(:) == min(temp));
+                    i_CP = Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(find(tri_points(h,1) == Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(:,2)),1);
+    
+                    i_surf(k,:) = [i_CP(1) tri_points(h,1) tempp(1) min(temp) 0];
+                %     tempp(1) == the index of the paired node on the opposing bone surface
+                    k = k + 1;
                 end
                 clear temp tempp
             end
 
             i_surf((i_surf(:,1) == 0),:) = [];
-            % toc
+
+            % figure()
+            % plot3(bone_STL2.Points(ROI,1),bone_STL2.Points(ROI,2),bone_STL2.Points(ROI,3),'.')
+            % hold on
+            % plot3(bone_STL2.Points(tempp,1),bone_STL2.Points(tempp,2),bone_STL2.Points(tempp,3),'*r')
+            % hold on
+            % plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.')
+            % hold on
+            % plot3(bone_STL1.Points(tri_points(h,1),1),bone_STL1.Points(tri_points(h,1),2),bone_STL1.Points(tri_points(h,1),3),'.')            
+            % axis equal
 
             %% Pull Mean and Gaussian Curvature Data
             % These next few sections calculate the congruence index between each
@@ -868,7 +875,7 @@ for group_count = 1:length(groups)
                 PCMin1(n,:) = mean1(n) - sqrt(mean1(n)^2 - gaus1(n));
                 PCMax1(n,:) = mean1(n) + sqrt(mean1(n)^2 - gaus1(n));
             end
-
+            
             for n = 1:length(mean2)
                 PCMin2(n,:) = mean2(n) - sqrt(mean2(n)^2 - gaus2(n));
                 PCMax2(n,:) = mean2(n) + sqrt(mean2(n)^2 - gaus2(n));
@@ -891,8 +898,34 @@ for group_count = 1:length(groups)
             RPCMax = zeros(length(mean1),1);
 
             for n = 1:length(mean1)
-                u = bone_STL2.Points(i_surf(n,1),:);
+                u = bone_STL2.Points(i_surf(n,3),:);
                 v = bone_STL1.Points(i_surf(n,2),:);
+
+                temp_center1 = incenter(bone_STL1);
+                tdist1 = pdist2(v, temp_center1,'euclidean');
+                tdist1 = find(tdist1 == min(tdist1));
+                temp_face1 = faceNormal(bone_STL1);
+                v = temp_face1(tdist1(1),:);
+
+                temp_center2 = incenter(bone_STL2);
+                tdist2 = pdist2(u, temp_center2,'euclidean');
+                tdist2 = find(tdist2 == min(tdist2));
+                temp_face2 = faceNormal(bone_STL2);
+                u = temp_face2(tdist2(1),:);
+                
+
+                % figure()
+                % plot3(bone_STL2.Points(:,1),bone_STL2.Points(:,2),bone_STL2.Points(:,3),'.')
+                % hold on
+                % plot3(bone_STL2.Points(i_surf(n,3),1),bone_STL2.Points(i_surf(n,3),2),bone_STL2.Points(i_surf(n,3),3),'*r')
+                % hold on
+                % plot3(temp_center1(tdist1(1),1),temp_center1(tdist1(1),2),temp_center1(tdist1(1),3),'*')
+                % hold on            
+                % plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.')
+                % hold on
+                % plot3(bone_STL1.Points(i_surf(n,2),1),bone_STL1.Points(i_surf(n,2),2),bone_STL1.Points(i_surf(n,2),3),'og')            
+                % axis equal    
+
                 alpha = acosd(dot(u,v)/(norm(u)*norm(v)));
                 delta = sqrt(CD1(n)^2 + CD2(n)^2 + 2*CD1(n)*CD2(n)*cosd(2*alpha));
                 RPCMin(n,:) = mean1(n) + mean2(n) - 0.5*delta;

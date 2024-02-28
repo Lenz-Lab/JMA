@@ -248,8 +248,8 @@ for n = 1:length(subjects)
     for CItoDist = 1:length(g)
         temp = cell(1,length(data.(subjects{n}).Frame(:,1)));
         for m = 1:length(data.(subjects{n}).Frame(:,1))
-	        % temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
-            temp(:,m) = {[data.(subjects{n}).CP.F_1(:,1) data.(subjects{n}).CP.F_1(:,CItoDist+1)]};
+	        temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
+            % temp(:,m) = {[data.(subjects{n}).CP.F_1(:,1) data.(subjects{n}).CP.F_1(:,CItoDist+1)]};
         end
         
         cp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));

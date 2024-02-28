@@ -227,14 +227,14 @@ for n = 1:study_num
         % structure is [(first tracked frame) (heelstrike) (toe-off) (last tracked frame)]
         for k = 1:2
             if k == 1
-                E = dir(fullfile(sprintf('%s\\%s\\',groups{n},subjects1{m}),'*.xlsx'));
+                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.xlsx'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\',groups{n},subjects1{m}),'*.csv'));
+                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.csv'));
                 end
             elseif k == 2
-                E = dir(fullfile(sprintf('%s\\%s\\',groups{n},subjects1{m}),'*.csv'));
+                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.csv'));
                 if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\',groups{n},subjects1{m}),'*.xlsx'));
+                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.xlsx'));
                 end        
             end
 

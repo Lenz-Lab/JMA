@@ -1196,7 +1196,12 @@ if stats_type == 4
         for plot_data = inpdata    
                 tif_folder = [];
                 N_length = [];
-                for n = 1:Bone_Data{1}.max_frames
+                if norm_raw == 1
+                    frame_count_ind = Bone_Data{1}.max_frames;
+                elseif norm_raw ==2
+                    frame_count_ind = length(fieldnames(Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData));
+                end
+                for n = 1:frame_count_ind
                     %% Create directory to save .tif images
                         tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                             ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...

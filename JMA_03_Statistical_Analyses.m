@@ -15,9 +15,14 @@
 clc; close all; clear
 addpath(sprintf('%s\\Scripts',pwd))
 
-delete(gcp('nocreate'))
-pool = parpool([1 100]);
-clc
+% Check if there is a parallel pool already
+pool = gcp('nocreate');
+% If no parpool, create one
+if isempty(pool)
+    % delete(gcp('nocreate'))
+    pool = parpool([1 100]);
+    clc
+end
 pool.IdleTimeout = 60;
 
 %% User Inputs

@@ -131,9 +131,15 @@ for n = 1:study_num
     addpath(fldr_name{n})
 end
 
-delete(gcp('nocreate'))
-pool = parpool([1 100]);
-clc
+% Check if there is a parallel pool already
+pool = gcp('nocreate');
+% If no parpool, create one
+if isempty(pool)
+    % delete(gcp('nocreate'))
+    pool = parpool([1 100]);
+    clc
+end
+pool.IdleTimeout = 60;
 
 %% Loading Data
 fprintf('Loading Data:\n')
@@ -169,7 +175,8 @@ for n = 1:study_num
                 temp = split(temp(1),'_');
 
                 for d = 1:length(temp)
-                    temp_check = strfind(lower(bone_names{b}),lower(temp{d}));
+                    % temp_check = strfind(lower(bone_names{b}),lower(temp{d}));
+                    temp_check = isequal(lower(bone_names{b}),lower(temp{d}));
                     if  temp_check == 1
                         Data.(pulled_files{m}).(bone_names{b}).(bone_names{b}) = stlread(S(c).name);
                         
@@ -277,18 +284,6 @@ end
 
 subjects = subjects(~cellfun('isempty',subjects));
 
-%% Waitbar Preloading
-% waitbar calculations
-g = fieldnames(Data);
-
-waitbar_length = 0;
-for n = 1:length(g)
-    waitbar_length = waitbar_length + length(Data.(g{n}).(bone_names{1}).Kinematics(:,1));
-end
-waitbar_count = 1;
-
-W = waitbar(waitbar_count/waitbar_length,'Identifying bone indices to correspondence particles...');
-
 %% Identify Indices on Bones from SSM Local Particles
 fprintf('Local Particles -> Bone Indices\n')
 fprintf('   Iterative Closest Point Alignment to Correspondence Particles\n')
@@ -354,11 +349,6 @@ for subj_count = 1:length(g)
                     ICP{icp_count+1}.P     = P;
                 end
 
-                % waitbar update
-                if isgraphics(W) == 1
-                    W = waitbar(waitbar_count/waitbar_length,W,'Identifying bone indices to correspondence particles...');
-                end
-                waitbar_count = waitbar_count + 1;
                 pool.IdleTimeout = 30;                
 
                 %%
@@ -481,6 +471,18 @@ if troubleshoot_mode == 1
     end
 end
 
+%% Waitbar Preloading
+% waitbar calculations
+g = fieldnames(Data);
+
+waitbar_length = 0;
+for n = 1:length(g)
+    waitbar_length = waitbar_length + length(Data.(g{n}).(bone_names{1}).Kinematics(:,1));
+end
+waitbar_count = 1;
+
+W = waitbar(waitbar_count/waitbar_length,'Transforming bones from kinematics...');
+
 %% Bone Transformations via Kinematics
 fprintf('Bone Transformations via Kinematics:\n')
 groups = fieldnames(subj_group);
@@ -498,14 +500,14 @@ for group_count = 1:length(groups)
         kine_data_length = Data.(subjects{subj_count}).(bone_names{1}).Kinematics;
         
         clear temp
-        M = dir(fullfile(sprintf('%s\\%s\\%s\\%s',data_dir,groups{group_count},subjects{subj_count}),'*mat'));
+        M = dir(fullfile(sprintf('%s\\%s\\%s\\%s',data_dir,groups{group_count},subjects{subj_count}),'*.mat'));
           
         if isempty(M) == 0 && overwrite_data == 0
             for c = 1:length(M)
                 temp_file = strsplit(M(c).name,'.');
                 temp_file = strrep(temp_file(1),' ','_');
                 temp_file = split(temp_file{1},'_');
-                if isequal(temp_file(2),bone_names{1}) && isequal(temp_file(3),bone_names{2})
+                if isequal(lower(temp_file(2)),lower(bone_names{1})) && isequal(lower(temp_file(3)),lower(bone_names{2}))
                     temp = load(M(c).name);
                     g = fieldnames(temp.Data);
                     Data.(string(g)) = temp.Data.(string(g));

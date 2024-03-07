@@ -311,7 +311,7 @@ for bone_count = 1:bone_amount
     bone_alph{bone_count} = 1;
 end
 % Colormap
-colormap_choice = 'arctic';
+colormap_choice = 'jet';%'arctic';
 
 incl_dist = true;
 
@@ -387,9 +387,6 @@ while isequal(set_change,1)
 
     RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
 
-
-
-
     set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
     if isequal(set_change,1)
         clear Prompt formats DefAns
@@ -414,23 +411,23 @@ while isequal(set_change,1)
         for bone_count = 1:bone_amount
             ba = strcat(strcat(ba,string(bone_alph{bone_count})),'_');                
         end
-        DefAns.Trans        = char(strrep(ba,'_',' '));
+        DefAns.Trans    = char(strrep(ba,'_',' '));
 
         Prompt(5,:)     = {'Colormap:','CMap',[]};
         
         for n = [1 3 4 7]
             formats(n,1).type   = 'edit';
-            formats(n,1).size = [100 20];                
+            formats(n,1).size   = [100 20];                
         end
         
         formats(5,1).type   = 'list';
         formats(5,1).style  = 'popupmenu';
-        formats(5,1).size = [100 20];
+        formats(5,1).size   = [100 20];
         if isequal(cmap_shift,1)
-            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
+            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','arctic','difference','type in your own'};
         end
         if exist('colormap_choice_new','var') == 0
-            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','difference','type in your own'};
+            formats(5,1).items          = {'jet','autumn','parula','hot','gray','pink','arctic','difference','type in your own'};
         elseif exist('colormap_choice_new','var') == 1
             formats(5,1).items{end}     = colormap_choice;
             formats(5,1).items{end+1}   = 'type in your own';

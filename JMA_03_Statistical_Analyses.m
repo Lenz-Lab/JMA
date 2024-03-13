@@ -26,7 +26,8 @@ end
 pool.IdleTimeout = 60;
 
 %% User Inputs
-stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
+stats_type = listdlg('ListString',{'ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)'},'Name','What statistical analysis, or visualization, would you like to perform?','ListSize',[500 250],'SelectionMode','single');
+% stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
 
 inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
     'Alpha Value (confidence interval)',...
@@ -38,18 +39,36 @@ additional_name = string(inp_ui{1});
 % Alpha value for stats
 alpha_val = str2double(inp_ui{2});
 
-frame_rate = str2double(inp_ui{3});
-
 if isequal(stats_type,1)
+    inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
+        'Alpha Value (confidence interval)'},...
+        'User Inputs',[1 100],{'','0.05'});
+    additional_name = string(inp_ui{1});
+    alpha_val       = str2double(inp_ui{2});
     inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for Group 1? (%)'...
         'What is the minimum percentage of participants that must be included for Group 2? (%)'}...
         ,'Quantity at particle to be included',[1 100],{'100','100'});    
     % percentage of partipants to be included in the analysis
     perc_part = [str2double(inp_uii{1}) str2double(inp_uii{2})];
+elseif isequal(stats_type,2)
+    inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
+        'Alpha Value (confidence interval)',...
+        'Frame Rate (video, dynamic only)'},...
+        'User Inputs',[1 100],{'','0.05','7'});
+    additional_name = string(inp_ui{1});
+    alpha_val       = str2double(inp_ui{2});
+    frame_rate      = str2double(inp_ui{3});
 elseif isequal(stats_type,3)
+    inp_ui = inputdlg({'Enter the name (for figures and results)'},...
+        'User Inputs',[1 100],{''});
+    additional_name = string(inp_ui{1});    
     inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for the group? (%)'},...
         'Quantity at particle to be included',[1 100],{'100'});    
     perc_part = [str2double(inp_uii{1})];
+elseif isequal(stats_type,4)
+    inp_ui = inputdlg({'Enter the name (for figures and results)'},...
+        'User Inputs',[1 100],{''});
+    additional_name = string(inp_ui{1});    
 end
 
 %% Number of Bones

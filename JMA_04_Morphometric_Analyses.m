@@ -11,11 +11,23 @@
 % Notes:
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 addpath(sprintf('%s\\Scripts',pwd))
 
 %% Load Data
-alpha_val = 0.05;
+clear Prompt DefAns Name formats Options
+Options.Resize      = 'on';
+Options.Interpreter = 'tex';
+
+Prompt(1,:)         = {'Alpha Value (\alpha): ','AlphaValue',[]};
+DefAns.AlphaValue   = '0.05';
+formats(1,1).type   = 'edit';
+formats(1,1).size   = [100 20];
+
+set_inp             = inputsdlg(Prompt,'Enter Alpha Value',formats,DefAns,Options);
+
+alpha_val = str2double(set_inp.AlphaValue);
+
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
 

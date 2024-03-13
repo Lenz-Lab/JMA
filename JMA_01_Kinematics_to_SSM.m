@@ -974,7 +974,8 @@ for group_count = 1:length(groups)
 
             if rem(frame_count,save_interval) == 0
                 fprintf('     saving .mat file backup...\n')
-                SaveData.Data.(subjects{subj_count}) = Data.(subjects{subj_count});
+                Data.(subjects{subj_count}).bone_names  = bone_names;
+                SaveData.Data.(subjects{subj_count})    = Data.(subjects{subj_count});
                 save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,groups{group_count},subjects{subj_count},bone_names{1},bone_names{2},(subjects{subj_count})),'-struct','SaveData');
                 clear SaveData
             end

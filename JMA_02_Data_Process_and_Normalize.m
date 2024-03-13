@@ -12,7 +12,7 @@
 % Notes: 
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 addpath(sprintf('%s\\Scripts',pwd))
 
 %% User Inputs

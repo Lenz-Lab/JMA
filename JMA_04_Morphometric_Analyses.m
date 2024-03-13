@@ -368,7 +368,7 @@ end
 % axis equal
 
 %%
-p_value = HotellingT2(data_aligned,pool);
+p_value = Compute_PValue_Group_Difference(data_aligned,alpha_val,pool);
 
 SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 

@@ -26,53 +26,90 @@ end
 pool.IdleTimeout = 60;
 
 %% User Inputs
-stats_type = listdlg('ListString',{'ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)'},'Name','What statistical analysis, or visualization, would you like to perform?','ListSize',[500 250],'SelectionMode','single');
-% stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
+stats_type = listdlg('ListString',{'Statistical Analyses (static or dynamic)',...
+    'Statistical Parametric Mapping (dynamic only)','Visualization Only - Group Results (static or dynamic)'...
+    ,'Visualization Only - Individual Subject Results (static or dynamic)'},'Name',...
+    'Perform stats or just visualize results?','ListSize',[500 100],'SelectionMode','single');
 
-inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
-    'Alpha Value (confidence interval)',...
-    'Frame Rate (video, dynamic only)'},...
-    'User Inputs',[1 100],{'','0.05','7'});
+clear Prompt DefAns Name formats Options
+Options.Resize      = 'on';
+Options.Interpreter = 'tex';
 
-additional_name = string(inp_ui{1});
-
-% Alpha value for stats
-alpha_val = str2double(inp_ui{2});
-
-if isequal(stats_type,1)
-    inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
-        'Alpha Value (confidence interval)'},...
-        'User Inputs',[1 100],{'','0.05'});
-    additional_name = string(inp_ui{1});
-    alpha_val       = str2double(inp_ui{2});
-    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for Group 1? (%)'...
-        'What is the minimum percentage of participants that must be included for Group 2? (%)'}...
-        ,'Quantity at particle to be included',[1 100],{'100','100'});    
-    % percentage of partipants to be included in the analysis
-    perc_part = [str2double(inp_uii{1}) str2double(inp_uii{2})];
-elseif isequal(stats_type,2)
-    inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
-        'Alpha Value (confidence interval)',...
-        'Frame Rate (video, dynamic only)'},...
-        'User Inputs',[1 100],{'','0.05','7'});
-    additional_name = string(inp_ui{1});
-    alpha_val       = str2double(inp_ui{2});
-    frame_rate      = str2double(inp_ui{3});
-elseif isequal(stats_type,3)
-    inp_ui = inputdlg({'Enter the name (for figures and results)'},...
-        'User Inputs',[1 100],{''});
-    additional_name = string(inp_ui{1});    
-    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for the group? (%)'},...
-        'Quantity at particle to be included',[1 100],{'100'});    
-    perc_part = [str2double(inp_uii{1})];
-elseif isequal(stats_type,4)
-    inp_ui = inputdlg({'Enter the name (for figures and results)'},...
-        'User Inputs',[1 100],{''});
-    additional_name = string(inp_ui{1});    
+Prompt(1,:)         = {'Appended name to output figures','AppendName',[]};
+DefAns.AppendName   = '';
+formats(1,1).type   = 'edit';
+formats(1,1).size   = [100 20];
+if stats_type == 1
+    stats_types_names = {'Student''s t-Test','one-way ANOVA','Hotelling''s T^2'};
+    Prompt(end+1,:)         = {'Stats Type','StatType',[]};
+    DefAns.StatType         = stats_types_names{1};
+    formats(end+1,:).format = 'text';
+    formats(end,:).type     = 'list';
+    formats(end,:).style    = 'radiobutton';
+    formats(end,:).items    = stats_types_names;
 end
 
+if stats_type < 3
+    Prompt(end+1,:)         = {'Alpha Value','AlphaVal',[]};
+    DefAns.AlphaVal         = '0.05';
+    formats(end+1,1).type   = 'edit';
+    formats(end,1).size     = [50 20];
+end
+
+if stats_type == 2
+    Prompt(end+1,:)         = {'Frame Rate','FrameRate',[]};
+    DefAns.FrameRate        = '20';
+    formats(end+1,1).type   = 'edit';
+    formats(end,1).size     = [50 20];
+end
+
+if stats_type == 1 || stats_type == 3    
+    Prompt(end+1,:)             = {'What is the minimum percentage of participants that must be included for Group 1? (%)','Group1',[]};
+    DefAns.Group1               = '100';
+    formats(end+1,1).type       = 'edit';
+    formats(end,1).size         = [50 20];
+
+    if stats_type == 1
+        Prompt(end+1,:)         = {'What is the minimum percentage of participants that must be included for Group 2? (%)','Group2',[]};
+        DefAns.Group2           = '100';
+        formats(end+1,1).type   = 'edit';
+        formats(end,1).size     = [50 20];   
+    end
+end
+
+Name                = 'Change figure settings';
+set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
+
+if stats_type == 1
+    for n = 1:size(stats_types_names,2)
+        if isequal(stats_types_names{n},set_inp.StatType)
+            stats1_type = n;
+        end
+    end    
+end
+
+frame_rate = [];
+if stats_type == 2
+    frame_rate      = str2double(set_inp.FrameRate);
+end
+
+alpha_val = 0.05;
+if stats_type < 3
+    alpha_val       = str2double(set_inp.AlphaVal);
+end
+
+if stats_type == 3 
+    perc_part = str2double(set_inp.Group1);
+elseif stats_type == 1
+    perc_part = [str2double(set_inp.Group1), str2double(set_inp.Group2)];
+end
+
+additional_name     = string(set_inp.AppendName);
+
 %% Number of Bones
-mult_group_bone = menu('Would you like to include multiple results (more than one bone, or one bone with multiple results mapped)?','Yes','No');
+mult_group_bone = listdlg('ListString',{'Yes (one or more joints visualized on one or more bones)','No  (one joint visualized on one bone)'},'Name',...
+    'Would you like to include multiple results (more than one bone, or one bone with multiple results mapped)?',...
+    'ListSize',[750 100],'SelectionMode','single');
 
 bone_amount = 1;
 if isequal(mult_group_bone,1)
@@ -146,7 +183,8 @@ if stats_type <= 2
     disp(data_2)
     
     if isequal(stats_type,1)
-        combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
+        combine_stats = listdlg('ListString',{'Yes','No'},'Name','Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','ListSize',[750 50],'SelectionMode','single');
+        % combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
     end
 
 elseif stats_type == 3 % Group no stats
@@ -688,7 +726,7 @@ Distance_Lower = str2double(cell2mat(temp(1)));
 
 fprintf('Processing...\n')
 
-%% ANOVA or t-Tests
+%% Statistical Analyses
 if isequal(stats_type,1)
     %% Find number of Correspondence Particles
     g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
@@ -736,60 +774,74 @@ if isequal(stats_type,1)
                         if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                             %% Student's t-Test or Wilcoxon Rank Sum
-                            if n == 1 && m == 1
-                                fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
-                            end
-                            test_type = 1;
-                            [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
-                            % Student's t-test
-                            % Wilcoxon rank sum test
-                            [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
-
-                            if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
-                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+                            if stats1_type == 1
+                                if n == 1 && m == 1
+                                    fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
+                                end
+                                test_type = 1;
+                                % Student's t-test
+                                [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
+                                
+                                % Wilcoxon rank sum test
+                                [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
+    
+                                if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                end
                             end
 
                             %% Hotelling's T2 Test
-                            % if n == 1 && m == 1
-                            %     fprintf('Multivariate Hotelling''s T^2 Test\n')
-                            % end
-                            % clear data
-                            % data{1} = statdata.(data_1);
-                            % data{2} = statdata.(data_2);
-                            % p_value = HotellingT2_1D(data,pool);
-                            % 
-                            % if isempty(p_value) == 0
-                            %     NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value, 1, norm_test(8,3)];% Shapiro-Wilk Normality test
-                            % end
+                            if stats1_type == 3
+                                if n == 1 && m == 1
+                                    fprintf('Multivariate Hotelling''s T^2 Test\n')
+                                end
+                                test_type = 1;
+                                data = cell(1,1);
+                                for id_t = 1:size(statdata.(data_1),2)
+                                    data{1}{id_t} = statdata.(data_1)(id_t);
+                                end
+                                for id_t = 1:size(statdata.(data_2),2)
+                                    data{2}{id_t} = statdata.(data_2)(id_t);
+                                end
+                                pool.IdleTimeout    = 360;
+                                p_value_hot         = Compute_PValue_Group_Difference(data,alpha_val,pool);
+    
+                                if ~isempty(p_value_hot)
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value_hot, p_value_hot, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                end                                
+                                clear data
+                            end
 
                         elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
                             if isempty(data_all) == 0 && isempty(agrp_id) == 0
-                                if n == 1 && m == 1
-                                    fprintf('One-way ANOVA or Kruskal-Wallis\n')   
-                                end
-                                test_type = 2;
-                                clear p_parametric p_nonparametric
-                                [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
-                                [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
-                                
-                                if comp_flip == 0
-                                    c = multcompare(pd_parametric,'display','off');
-                                    p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                        
-                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                    p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                                elseif comp_flip == 1
-                                    c = multcompare(pd_parametric,'display','off');
-                                    p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                        
-                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                    p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                                end
+                                if stats1_type == 2
+                                    if n == 1 && m == 1
+                                        fprintf('One-way ANOVA or Kruskal-Wallis\n')   
+                                    end
+                                    test_type = 2;
+                                    clear p_parametric p_nonparametric
+                                    [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
+                                    [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
+                                    
+                                    if comp_flip == 0
+                                        c = multcompare(pd_parametric,'display','off');
+                                        p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
                             
-                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
-                                if norm_test(8,3) == 0
-                                    not_normal.(g{g_count}) = 0;
+                                        c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                        p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+                                    elseif comp_flip == 1
+                                        c = multcompare(pd_parametric,'display','off');
+                                        p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                            
+                                        c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                        p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                                    end
+                                
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                    if norm_test(8,3) == 0
+                                        not_normal.(g{g_count}) = 0;
+                                    end
                                 end
                             end
                         end 

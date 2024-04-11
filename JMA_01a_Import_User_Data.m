@@ -318,12 +318,14 @@ for group_count = 1:length(groups)
     for subj_count= 1:length(subjects)
         fprintf('   %s\n',string(subjects(subj_count)))
         clear B
-        B.Data.(string(subjects(subj_count))).Side = A.Data.(string(subjects(subj_count))).Side;
-        B.Data.(string(subjects(subj_count))).Talus = A.Data.(string(subjects(subj_count))).Talus;
-        B.Data.(string(subjects(subj_count))).Calcaneus = A.Data.(string(subjects(subj_count))).Calcaneus;
-        B.Data.(string(subjects(subj_count))).Event = A.Data.(string(subjects(subj_count))).Event;
-        B.Data.(string(subjects(subj_count))).CoverageArea = A.Data.(string(subjects(subj_count))).CoverageArea;
-        B.Data.(string(subjects(subj_count))).MeasureData  = A.Data.(string(subjects(subj_count))).MeasureData;
+        if isfield(A.Data.(string(subjects(subj_count))),'Side')
+            B.Data.(string(subjects(subj_count))).Side      = A.Data.(string(subjects(subj_count))).Side;
+        end
+        B.Data.(string(subjects(subj_count))).Talus         = A.Data.(string(subjects(subj_count))).Talus;
+        B.Data.(string(subjects(subj_count))).Calcaneus     = A.Data.(string(subjects(subj_count))).Calcaneus;
+        B.Data.(string(subjects(subj_count))).Event         = A.Data.(string(subjects(subj_count))).Event;
+        B.Data.(string(subjects(subj_count))).CoverageArea  = A.Data.(string(subjects(subj_count))).CoverageArea;
+        B.Data.(string(subjects(subj_count))).MeasureData   = A.Data.(string(subjects(subj_count))).MeasureData;
         % B.Data.(string(subjects(subj_count))).ImportData = A.Data.(string(subjects(subj_count))).ImportData;
 
         save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),string(subjects(subj_count))),'-struct','B','-append');    

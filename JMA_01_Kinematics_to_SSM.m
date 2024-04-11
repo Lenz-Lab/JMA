@@ -162,6 +162,7 @@ for n = 1:study_num
     
     %% Load Data for Each Subject
     for m = 1:length(pulled_files)
+        pool.IdleTimeout = 60;
         %%
         fprintf('   %s\n',pulled_files{m})
         addpath(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}))
@@ -292,6 +293,7 @@ g = fieldnames(Data);
 ICP_group = cell(length(g),1);
 
 for subj_count = 1:length(g)
+    pool.IdleTimeout = 60;
     for bone_count = 1:length(bone_names)
         %%
         if isfield(Data.(subjects{subj_count}).(bone_names{bone_count}),'CP') == 1

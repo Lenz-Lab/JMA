@@ -4,7 +4,7 @@
 
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group
-% Date: 3/24/2023 
+% Date: 3/24/2023
 
 % Modified By: 
 % Version: 
@@ -56,7 +56,7 @@ if stats_type < 3
     formats(end,1).size     = [50 20];
 end
 
-if stats_type == 2
+if stats_type == 2 || stats_type == 3 || stats_type == 4
     Prompt(end+1,:)         = {'Frame Rate','FrameRate',[]};
     DefAns.FrameRate        = '20';
     formats(end+1,1).type   = 'edit';
@@ -89,7 +89,7 @@ if stats_type == 1
 end
 
 frame_rate = [];
-if stats_type == 2
+if stats_type == 2 || stats_type == 3 || stats_type == 4
     frame_rate      = str2double(set_inp.FrameRate);
 end
 
@@ -189,18 +189,21 @@ if stats_type <= 2
 
 elseif stats_type == 3 % Group no stats
     %%
-    [indx] = menu('Please select group(s)',groups);
+    indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
+    % [indx] = menu('Please select the group',groups);
     data_1 = groups(indx);
 
 elseif stats_type == 4 % Individual no stats
     %%
-    [indx] = menu('Please select group(s)',groups);
+    indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
+    % [indx] = menu('Please select group(s)',groups);
     groups = groups(indx);
 
     temp = subj_group.(string(groups)).SubjectList;
     [indx,~] = listdlg('ListString',temp,'Name','Please select participant(s)','ListSize',[500 500]);
-
-    norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
+    
+    norm_raw = listdlg('ListString',{'Normalized','Raw'},'Name','Would you like to see normalized or raw results? (dynamic)','ListSize',[750 50],'SelectionMode','single');
+    % norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
     Bone_Ind = cell(bone_amount,1);
@@ -418,7 +421,8 @@ bead_color = [0.85 0.85 0.85];
 fig_set_name = [];
 MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
 if isequal(isempty(MF),0)
-    prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
+    prev_fig_set = listdlg('ListString',{'Yes','No'},'Name','Would you like to load a previous figure setting?','ListSize',[750 50],'SelectionMode','single');
+    % prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
     if isequal(prev_fig_set,1)
         fig_set_name = uigetfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\*.mat',data_dir));
         load(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s',data_dir,fig_set_name));
@@ -443,8 +447,8 @@ while isequal(set_change,1)
     % RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 
     RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
-
-    set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
+    set_change = listdlg('ListString',{'Yes (modify)','No (proceed)','No (save settings and proceed)'},'Name','Would you like to load a previous figure setting?','ListSize',[750 50],'SelectionMode','single');
+    % set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
     if isequal(set_change,1)
         clear Prompt formats DefAns
         Options.Resize = 'on';
@@ -875,7 +879,7 @@ if isequal(stats_type,2)
     gg = fieldnames(Bone_Data{1}.DataOut_SPM.(string(g(1))));
     for g_count = inpdata
         for bone_count = 1:bone_amount
-            fprintf('Processing Bone: %s\n',string(Bone_Data{bone_count}.bone_names(1)))
+            fprintf('Processing Bone (%s): %s\n',g{g_count},string(Bone_Data{bone_count}.bone_names(1)))
             reg_sig.(g{g_count}){bone_count} = {};
             for n = 1:min([length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1))) length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_2)))])
                 clear section1 section2 pperc_stance
@@ -1106,10 +1110,25 @@ if stats_type < 3
                     NodalIndex{bone_count}  = [];
                     NodalData{bone_count}   = [];
                     for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(:,1))
+                        % Checks that the distance at the particle is
+                        % within the limits for both groups, if so it will
+                        % be included in the figure
                         if Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) > Distance_Lower && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) <= Distance_Upper && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_2))(m,n) <= Distance_Upper
-                            NodalIndex{bone_count}(k,:) = m;
-                            NodalData{bone_count}(k,:)  = Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n);
-                            k = k + 1;
+                            % Checks that the number of data mapped at the
+                            % particle is equal to the total number of
+                            % subjects in each respective group. This is so
+                            % that what is being shown in the figure is
+                            % only the correspondence particles where SPM
+                            % was conducted on them. That way there is no
+                            % misrepresenting the data.
+                            if length(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(plot_data_name(plot_data))).(string(data_1)){m,n})) == ...
+                                    length(Bone_Data{bone_count}.subj_group.(string(data_1)).SubjectList) && ...
+                                length(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(plot_data_name(plot_data))).(string(data_2)){m,n})) == ...
+                                length(Bone_Data{bone_count}.subj_group.(string(data_2)).SubjectList)
+                                NodalIndex{bone_count}(k,:) = m;
+                                NodalData{bone_count}(k,:)  = Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n);
+                                k = k + 1;
+                            end
                         end
                     end
 

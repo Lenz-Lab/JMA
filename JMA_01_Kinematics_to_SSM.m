@@ -105,6 +105,11 @@ DefAns.ROIthresh        = '10';
 formats(9,1).type       = 'edit';
 formats(9,1).size       = [100 20];
 
+Prompt(10,:)            = {'Align the correspondence particles to the mesh surface? (perform ICP based on minimum error)','AlignCk',[]};
+DefAns.AlignCk          = true;
+formats(10,1).type      = 'check';
+formats(10,1).size      = [100 20];
+
 set_inp                 = inputsdlg(Prompt,'User Inputs',formats,DefAns,Options);
 
 bone_names              = {set_inp.Bone1,set_inp.Bone2};
@@ -115,6 +120,7 @@ coverage_area_check     = set_inp.CovArea;
 save_stl                = set_inp.SavArea;
 troubleshoot_mode       = set_inp.TrblShoot;
 ROI_threshold1          = str2double(set_inp.ROIthresh);
+alignment_check         = set_inp.AlignCk;
 
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
@@ -297,7 +303,8 @@ for subj_count = 1:length(g)
     for bone_count = 1:length(bone_names)
         %%
         if isfield(Data.(subjects{subj_count}).(bone_names{bone_count}),'CP') == 1
-            fprintf('      Aligning Subject %s\n',subjects{subj_count})
+            if alignment_check
+                fprintf('      Aligning Subject %s\n',subjects{subj_count})
                 % This section is important! If the bones used to create the
                 % shape model were aligned OUTSIDE of ShapeWorks than this
                 % section is necessary. If they were aligned and groomed
@@ -359,13 +366,26 @@ for subj_count = 1:length(g)
                 ICP_group{subj_count}.P     = P;
                 ICP_group{subj_count}.CP    = CP;
                 clear ER_temp ICP
+            elseif ~alignment_check
+                P                           = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).Points;
+                ICP_group{subj_count}.P     = P;
+                CP                          = Data.(subjects{subj_count}).(bone_names{bone_count}).CP;
+                ICP_group{subj_count}.CP    = CP;
+            end
 
             %% Identify Nodes and CP
 
             % Find the .stl nodes and their respective correspondence
             % particles and save to Data structure
-                        
-            tol = 2;
+            RI = randi([1,size(Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList,1)],1,floor(size(Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList,1)/10));
+            list_temp = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList(RI,:);
+            list_distances = zeros(length(list_temp(:,1)),1);
+            for lt_i = 1:length(list_temp(:,1))
+                list_distances(lt_i,:) = max([pdist2(P(list_temp(lt_i,1),:),P(list_temp(lt_i,2),:),'euclidean'), pdist2(P(list_temp(lt_i,2),:),P(list_temp(lt_i,3),:),'euclidean'), pdist2(P(list_temp(lt_i,3),:),P(list_temp(lt_i,1),:),'euclidean')]);
+            end
+            tol = max(list_distances)*1.1;
+
+            % tol = 5;
             i_pair = zeros(length(CP(:,1)),2);
             for r = 1:length(CP(:,1))
                 ROI = find(P(:,1) >= CP(r,1)-tol & P(:,1) <= CP(r,1)+tol & P(:,2) >= CP(r,2)-tol & P(:,2) <= CP(r,2)+tol & P(:,3) >= CP(r,3)-tol & P(:,3) <= CP(r,3)+tol);
@@ -416,6 +436,7 @@ if troubleshoot_mode == 1
         error('Aborted running the script! Please double check your correspondence particle .particles files OR the bone model .stl files if they did not align properly')
     elseif isequal(q,'Cancel')
         troubleshoot_mode = 0;
+        close all
     elseif isequal(q,'Yes')
         fprintf('Continuing from troubleshoot:\n')
         close all
@@ -521,7 +542,7 @@ for group_count = 1:length(groups)
                Data.(subjects{subj_count}) = temp.Data.(subjects{subj_count});
             end
         end
-        clearvars bone_data1 bone_data2 bone_STL1 bone_STL2 Bone_STL1 Bone_STL2 bone_center1_identified
+        clearvars bone_data1 bone_data2 bone_STL1 bone_STL2 Bone_STL1 Bone_STL2 bone_center1_identified alignment_check
 
         %% Pair within each frame
         for frame_count = frame_start:length(kine_data_length(:,1))
@@ -608,7 +629,7 @@ for group_count = 1:length(groups)
             
             % Parallel loop for ray intersections
             % tic
-            temp_N = [];
+            temp_N = zeros(size(bone_center1(i_ROI,:),1),1);
             parfor (norm_check = 1:size(bone_center1(i_ROI,:),1),pool)
                 [temp_int, ~, ~, ~, ~] = TriangleRayIntersection(bone_center1(i_ROI(norm_check),:),bone_normal1(i_ROI(norm_check),:),a1,a2,a3,'planetype','one sided');
                 temp_INT = find(temp_int == true);
@@ -965,7 +986,7 @@ for group_count = 1:length(groups)
                 coverage_area_check kine_data_length save_stl_frame save_stl ...
                 group_count groups troubleshoot_mode waitbar_count waitbar_length W ...
                 bone_data1 bone_data2 ROI_threshold1 ...
-                bone_center2_identified bone_center1_identified
+                bone_center2_identified bone_center1_identified alignment_check
 
             MF = dir(fullfile(sprintf('%s\\Outputs',data_dir)));
             if isempty(MF) == 1

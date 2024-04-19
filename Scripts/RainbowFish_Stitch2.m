@@ -321,7 +321,7 @@ for bone_count = 1:bone_amount
     
     k = 1;
     for cp_count = 1:length(NodalIndex{bone_count}(:,1))
-        if NodalData{bone_count}(cp_count,:) >=  CLimits(1) && NodalData{bone_count}(cp_count,:) <= CLimits(2)
+        % if NodalData{bone_count}(cp_count,:) >=  CLimits(1) && NodalData{bone_count}(cp_count,:) <= CLimits(2)
             % check if significant
             temp_p = find(NodalIndex{bone_count}(cp_count,:) == SPMIndex{bone_count});
             
@@ -374,7 +374,7 @@ for bone_count = 1:bone_amount
                 end
             end
         end
-    end
+    % end
 end
 close
 

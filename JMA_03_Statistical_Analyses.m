@@ -378,7 +378,7 @@ incl_dist = true;
 clear Prompt DefAns Name formats Options
 
 fprintf('Changing figure settings...\n')
-uiwait(msgbox('It will take time to load the bone and correspondence models, thanks for your patience!'))
+% uiwait(msgbox('It will take time to load the bone and correspondence models, thanks for your patience!'))
 close all
 done_selecting = 0;
 

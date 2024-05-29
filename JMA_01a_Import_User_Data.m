@@ -112,7 +112,7 @@ for n = 1:length(groups)
                         % the number of frames and column indices are bone mesh
                         % points or vertices.
                         new_data_name = E(e_count).name;
-                        new_data_name = strrep(strrep(new_data_name,'.csv',''),'.xslx','');
+                        new_data_name = strrep(strrep(new_data_name,'.csv',''),'.xlsx','');
                         rem = strfind(lower(new_data_name),string(lower(subjects(m))));
                         new_data_name(rem:(strlength(string(lower(subjects(m))))+rem-1)) = '';
                         new_data_name = lower(strrep(strrep(new_data_name,'_',''),' ',''));
@@ -321,11 +321,11 @@ for group_count = 1:length(groups)
         if isfield(A.Data.(string(subjects(subj_count))),'Side')
             B.Data.(string(subjects(subj_count))).Side      = A.Data.(string(subjects(subj_count))).Side;
         end
-        B.Data.(string(subjects(subj_count))).Talus         = A.Data.(string(subjects(subj_count))).Talus;
-        B.Data.(string(subjects(subj_count))).Calcaneus     = A.Data.(string(subjects(subj_count))).Calcaneus;
-        B.Data.(string(subjects(subj_count))).Event         = A.Data.(string(subjects(subj_count))).Event;
-        B.Data.(string(subjects(subj_count))).CoverageArea  = A.Data.(string(subjects(subj_count))).CoverageArea;
-        B.Data.(string(subjects(subj_count))).MeasureData   = A.Data.(string(subjects(subj_count))).MeasureData;
+        B.Data.(string(subjects(subj_count))).(bone_names{1})   = A.Data.(string(subjects(subj_count))).(bone_names{1});
+        B.Data.(string(subjects(subj_count))).(bone_names{2})   = A.Data.(string(subjects(subj_count))).(bone_names{2});
+        B.Data.(string(subjects(subj_count))).Event             = A.Data.(string(subjects(subj_count))).Event;
+        B.Data.(string(subjects(subj_count))).CoverageArea      = A.Data.(string(subjects(subj_count))).CoverageArea;
+        B.Data.(string(subjects(subj_count))).MeasureData       = A.Data.(string(subjects(subj_count))).MeasureData;
         % B.Data.(string(subjects(subj_count))).ImportData = A.Data.(string(subjects(subj_count))).ImportData;
 
         save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,string(groups(group_count)),string(subjects(subj_count)),string(bone_names(1)),string(bone_names(2)),string(subjects(subj_count))),'-struct','B','-append');    

@@ -156,6 +156,10 @@ fprintf('Normalizing data...\n')
 for subj_count = 1:length(subjects)
     if isfield(Data.(subjects{subj_count}),'Event') == 1
         frames = Data.(subjects{subj_count}).Event;
+        % Fixed so it goes to length of the activity.
+        if isequal(Data.(subjects{subj_count}).Event,[1 1 1 1])
+            frames = [1 1 length(fieldnames(Data.(subjects{subj_count}).MeasureData)) length(fieldnames(Data.(subjects{subj_count}).MeasureData))];
+        end        
     elseif isfield(Data.(subjects{subj_count}),'Event') == 0
         frames = [1 1 1 1];
         if length(fieldnames(Data.(subjects{subj_count}).MeasureData)) > 1
@@ -363,6 +367,8 @@ clearvars -except pool data_dir subjects bone_names Data subj_count frame_count 
 
 %% Calculate Mean Congruence and Distance at Each Common Correspondence Particle
 fprintf('Calculating Mean Data... \n')
+
+DataOut_SPM = [];
 
 g = fieldnames(subj_group);
 for study_pop = 1:length(g)

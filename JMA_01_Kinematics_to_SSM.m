@@ -251,7 +251,8 @@ for n = 1:study_num
                     E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.xlsx'));
                 end        
             end
-
+            
+            Data.(pulled_files{m}).Event = [1 1 1 1];
             if isempty(E) == 1
                 Data.(pulled_files{m}).Event = [1 1 1 1];
             elseif isempty(E) == 0
@@ -293,7 +294,10 @@ subjects = subjects(~cellfun('isempty',subjects));
 
 %% Identify Indices on Bones from SSM Local Particles
 fprintf('Local Particles -> Bone Indices\n')
-fprintf('   Iterative Closest Point Alignment to Correspondence Particles\n')
+if alignment_check
+    fprintf('   Iterative Closest Point Alignment to Correspondence Particles\n')
+end
+
 g = fieldnames(Data);
 
 ICP_group = cell(length(g),1);
@@ -383,7 +387,7 @@ for subj_count = 1:length(g)
             for lt_i = 1:length(list_temp(:,1))
                 list_distances(lt_i,:) = max([pdist2(P(list_temp(lt_i,1),:),P(list_temp(lt_i,2),:),'euclidean'), pdist2(P(list_temp(lt_i,2),:),P(list_temp(lt_i,3),:),'euclidean'), pdist2(P(list_temp(lt_i,3),:),P(list_temp(lt_i,1),:),'euclidean')]);
             end
-            tol = max(list_distances)*1.1;
+            tol = max(list_distances)*1.5;
 
             % tol = 5;
             i_pair = zeros(length(CP(:,1)),2);
@@ -631,6 +635,7 @@ for group_count = 1:length(groups)
             % tic
             temp_N = zeros(size(bone_center1(i_ROI,:),1),1);
             parfor (norm_check = 1:size(bone_center1(i_ROI,:),1),pool)
+            % for norm_check = 1:size(bone_center1(i_ROI,:))
                 [temp_int, ~, ~, ~, ~] = TriangleRayIntersection(bone_center1(i_ROI(norm_check),:),bone_normal1(i_ROI(norm_check),:),a1,a2,a3,'planetype','one sided');
                 temp_INT = find(temp_int == true);
                 if ~isempty(temp_INT)      

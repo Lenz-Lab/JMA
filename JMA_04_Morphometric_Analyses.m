@@ -11,11 +11,20 @@
 % Notes:
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 addpath(sprintf('%s\\Scripts',pwd))
 
+% Check if there is a parallel pool already
+pool = gcp('nocreate');
+% If no parpool, create one
+if isempty(pool)
+    % delete(gcp('nocreate'))
+    pool = parpool([1 100]);
+    clc
+end
+pool.IdleTimeout = 60;
+
 %% Load Data
-alpha_val = 0.05;
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
 
@@ -167,19 +176,6 @@ end
 
 clear Bone_Data
 %%
-
-% Check if there is a parallel pool already
-pool = gcp('nocreate');
-% If no parpool, create one
-if isempty(pool)
-    % delete(gcp('nocreate'))
-    pool = parpool([1 100]);
-    clc
-end
-pool.IdleTimeout = 60;
-
-pool.IdleTimeout = 60;
-
 ref_shape.vertices  = MeanShape{1}.Points;
 ref_shape.faces     = MeanShape{1}.ConnectivityList;
 
@@ -239,8 +235,15 @@ DefAns.DistMap      = true;
 formats(8,1).type   = 'check';
 formats(8,1).size   = [100 20];
 
+Prompt(9,:)         = {'Alpha Value (\alpha): ','AlphaValue',[]};
+DefAns.AlphaValue   = '0.05';
+formats(9,1).type   = 'edit';
+formats(9,1).size   = [100 20];
+
 Name                = 'Change figure settings';
 set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
+
+alpha_val = str2double(set_inp.AlphaValue);
 
 % Pull data out
 load_prev           = set_inp.PerspLoad;
@@ -266,11 +269,6 @@ incl_dist           = set_inp.DistMap;
 
 p_test = 1;
 colormap_choice     = 'rudifference';
-
-%% Parallel Pool
-delete(gcp('nocreate'))
-pool = parpool([1 100]);
-clc
 
 %% ICP Alignment
 data_aligned    = cell(1,1);
@@ -356,7 +354,8 @@ end
 % axis equal
 
 %%
-p_value = HotellingT2(data_aligned,pool);
+fprintf('Performing Hotelling''s T^2 Test...\n')
+p_value = Compute_PValue_Group_Difference(data_aligned,alpha_val,pool);
 
 SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 
@@ -377,6 +376,11 @@ Figure_Out.Title    = grp_name_A;
 
 RainbowFish_Plot(BoneSTL,Figure_Out,CLimits,view_perspective,stats_type)
 
+%% Save Figure
+tif_folder = sprintf('%s\\Results\\Morphometrics\\%s',data_dir,bone_names{1});
+mkdir(tif_folder)
+saveas(gcf,sprintf('%s\\%s_%s_vs_%s.tif',tif_folder,bone_names{1},grp_name_A,grp_name_B));
+
 %%
 BoneSTL_NoPart.faces        = MeanShape{2}.ConnectivityList;
 BoneSTL_NoPart.vertices     = MeanShape{2}.Points;
@@ -388,3 +392,8 @@ Figure_Out_NoPart.Disc_All = [];
 Figure_Out_NoPart.Title = grp_name_B;
 
 RainbowFish_Plot(BoneSTL_NoPart,Figure_Out_NoPart,CLimits,view_perspective,stats_type)
+
+%% Save Figure Comparison
+saveas(gcf,sprintf('%s\\%s_noStats_%s.tif',tif_folder,bone_names{1},grp_name_B))
+
+% fprintf(tif_folder)

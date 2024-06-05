@@ -4,7 +4,7 @@
 
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group
-% Date: 3/24/2023 
+% Date: 3/24/2023
 
 % Modified By: 
 % Version: 
@@ -26,34 +26,91 @@ end
 pool.IdleTimeout = 60;
 
 %% User Inputs
-stats_type = menu('What statistical analysis, or visualization, would you like to perform?','ANOVA or t-Test (Kruskal-Wallis or Rank-Sum)','Statistical Parametric Analysis (two groups and dynamic only)','Group Results (no stats)','Individual Results (no stats)');
+stats_type = listdlg('ListString',{'Statistical Analyses (static or dynamic)',...
+    'Statistical Parametric Mapping (dynamic only)','Visualization Only - Group Results (static or dynamic)',...
+    'Visualization Only - Individual Subject Results (static or dynamic)', ...
+    'Error - Group Results (static or dynamic)'},'Name',...
+    'Perform stats or just visualize results?','ListSize',[500 100],'SelectionMode','single');
 
-inp_ui = inputdlg({'Enter the name of the comparison (for figures and results)',...
-    'Alpha Value (confidence interval)',...
-    'Frame Rate (video, dynamic only)'},...
-    'User Inputs',[1 100],{'','0.05','7'});
+clear Prompt DefAns Name formats Options
+Options.Resize      = 'on';
+Options.Interpreter = 'tex';
 
-additional_name = string(inp_ui{1});
-
-% Alpha value for stats
-alpha_val = str2double(inp_ui{2});
-
-frame_rate = str2double(inp_ui{3});
-
-if isequal(stats_type,1)
-    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for Group 1? (%)'...
-        'What is the minimum percentage of participants that must be included for Group 2? (%)'}...
-        ,'Quantity at particle to be included',[1 100],{'100','100'});    
-    % percentage of partipants to be included in the analysis
-    perc_part = [str2double(inp_uii{1}) str2double(inp_uii{2})];
-elseif isequal(stats_type,3)
-    inp_uii = inputdlg({'What is the minimum percentage of participants that must be included for the group? (%)'},...
-        'Quantity at particle to be included',[1 100],{'100'});    
-    perc_part = [str2double(inp_uii{1})];
+Prompt(1,:)         = {'Appended name to output figures','AppendName',[]};
+DefAns.AppendName   = '';
+formats(1,1).type   = 'edit';
+formats(1,1).size   = [100 20];
+if stats_type == 1
+    stats_types_names = {'Student''s t-Test','one-way ANOVA','Hotelling''s T^2'};
+    Prompt(end+1,:)         = {'Stats Type','StatType',[]};
+    DefAns.StatType         = stats_types_names{1};
+    formats(end+1,:).format = 'text';
+    formats(end,:).type     = 'list';
+    formats(end,:).style    = 'radiobutton';
+    formats(end,:).items    = stats_types_names;
 end
 
+if stats_type < 3
+    Prompt(end+1,:)         = {'Alpha Value','AlphaVal',[]};
+    DefAns.AlphaVal         = '0.05';
+    formats(end+1,1).type   = 'edit';
+    formats(end,1).size     = [50 20];
+end
+
+if stats_type == 2 || stats_type == 3 || stats_type == 4 || stats_type == 5
+    Prompt(end+1,:)         = {'Frame Rate','FrameRate',[]};
+    DefAns.FrameRate        = '20';
+    formats(end+1,1).type   = 'edit';
+    formats(end,1).size     = [50 20];
+end
+
+if stats_type == 1 || stats_type == 3 || stats_type == 5
+    Prompt(end+1,:)             = {'What is the minimum percentage of participants that must be included for Group 1? (%)','Group1',[]};
+    DefAns.Group1               = '100';
+    formats(end+1,1).type       = 'edit';
+    formats(end,1).size         = [50 20];
+
+    if stats_type == 1
+        Prompt(end+1,:)         = {'What is the minimum percentage of participants that must be included for Group 2? (%)','Group2',[]};
+        DefAns.Group2           = '100';
+        formats(end+1,1).type   = 'edit';
+        formats(end,1).size     = [50 20];   
+    end
+end
+
+Name                = 'Change figure settings';
+set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
+
+if stats_type == 1
+    for n = 1:size(stats_types_names,2)
+        if isequal(stats_types_names{n},set_inp.StatType)
+            stats1_type = n;
+        end
+    end    
+end
+
+frame_rate = [];
+if stats_type == 2 || stats_type == 3 || stats_type == 4
+    frame_rate      = str2double(set_inp.FrameRate);
+end
+
+alpha_val = 0.05;
+if stats_type < 3
+    alpha_val       = str2double(set_inp.AlphaVal);
+end
+
+if stats_type == 3 || stats_type == 5
+    perc_part = str2double(set_inp.Group1);
+elseif stats_type == 1
+    perc_part = [str2double(set_inp.Group1), str2double(set_inp.Group2)];
+end
+
+additional_name     = string(set_inp.AppendName);
+
 %% Number of Bones
-mult_group_bone = menu('Would you like to include multiple results (more than one bone, or one bone with multiple results mapped)?','Yes','No');
+mult_group_bone = listdlg('ListString',{'Yes (one or more joints visualized on one or more bones)','No  (one joint visualized on one bone)'},'Name',...
+    'Would you like to include multiple results (more than one bone, or one bone with multiple results mapped)?',...
+    'ListSize',[750 100],'SelectionMode','single');
 
 bone_amount = 1;
 if isequal(mult_group_bone,1)
@@ -127,23 +184,29 @@ if stats_type <= 2
     disp(data_2)
     
     if isequal(stats_type,1)
-        combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
+        combine_stats = listdlg('ListString',{'Yes','No'},'Name','Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','ListSize',[750 50],'SelectionMode','single');
+        % combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
     end
 
-elseif stats_type == 3 % Group no stats
+elseif stats_type == 3 || stats_type == 5 % Group no stats 
     %%
-    [indx] = menu('Please select group(s)',groups);
+    indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
+    % [indx] = menu('Please select the group',groups);
     data_1 = groups(indx);
 
 elseif stats_type == 4 % Individual no stats
     %%
-    [indx] = menu('Please select group(s)',groups);
+    indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
+    % [indx] = menu('Please select group(s)',groups);
     groups = groups(indx);
 
     temp = subj_group.(string(groups)).SubjectList;
     [indx,~] = listdlg('ListString',temp,'Name','Please select participant(s)','ListSize',[500 500]);
+    
+    norm_raw = listdlg('ListString',{'Normalized','Raw'},'Name','Would you like to see normalized or raw results? (dynamic)','ListSize',[750 50],'SelectionMode','single');
+    % norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
 
-    norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
+    alignment_check = listdlg('ListString',{'Yes','No'},'Name','Do the particles need aligned to the models?','ListSize',[750 50],'SelectionMode','single');
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
     Bone_Ind = cell(bone_amount,1);
@@ -163,17 +226,17 @@ elseif stats_type == 4 % Individual no stats
                 for d = 1:length(temp)
                     bone_c1  = isequal(lower(string(bone_names(1))),lower(string(temp(d))));
                     bone_c2  = isequal(lower(string(bone_names(2))),lower(string(temp(d))));
-                    group_c  = isequal(lower(groups{1}),lower(string(temp(d))));
+                    % group_c  = isequal(lower(groups{1}),lower(string(temp(d))));
                     if isequal(bone_c1,1)
                         bone_check1 = 1;
                     end
                     if isequal(bone_c2,1)
                         bone_check2 = 1;
                     end                    
-                    if isequal(group_c,1)
-                        group_check = 1;
-                    end
-                    if isequal(bone_check1,1) && isequal(bone_check2,1) && isequal(group_check,1)
+                    % if isequal(group_c,1)
+                    %     group_check = 1;
+                    % end
+                    if isequal(bone_check1,1) && isequal(bone_check2,1) %&& isequal(group_check,1)
                         Bone_Ind{bone_count}.(string(data_1(subj_count))) = load(S(c).name);
                     end
                 end
@@ -184,10 +247,14 @@ end
 
 inpdata = listdlg('ListString',fieldnames(Bone_Data{1}.DataOut),'Name','Please pick which data to analyze','ListSize',[500 250]);
 
+if stats_type == 5
+    inpdata_groundtruth = listdlg('ListString',fieldnames(Bone_Data{1}.DataOut),'Name','Please pick the ''ground truth'' or actual measurement data','ListSize',[500 250]);
+end
+
 clear Prompt DefAns Name formats
 
 %% Load .stl Bone File for Plots
-if stats_type < 4
+if stats_type < 4 || stats_type == 5
     % MeanShape = cell(bone_amount,1);
     for bone_count = 1:bone_amount
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
@@ -241,9 +308,12 @@ if stats_type < 4
     end
 elseif stats_type == 4
     %%
-    fprintf('Aligning bones to correspondence particles...\n')
+    if alignment_check == 1
+        fprintf('Aligning bones to correspondence particles...\n')
+    end
     for subj_count = 1:length(data_1)
         for bone_count = 1:bone_amount
+            if alignment_check == 1
             bone_names                  = Bone_Data{bone_count}.bone_names;
             MeanCP_Ind.(data_1(subj_count)){bone_count} = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
             MeanShape1                  = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
@@ -290,10 +360,15 @@ elseif stats_type == 4
             
             temp_MeanShape.Points = P;
             MeanShape_Ind.(data_1(subj_count)){bone_count} = triangulation(MeanShape1.ConnectivityList,temp_MeanShape.Points);
-        end
-    end
-end
 
+
+            elseif alignment_check == 2
+                MeanCP_Ind.(data_1(subj_count)){bone_count}     = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
+                MeanShape_Ind.(data_1(subj_count)){bone_count}  = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
+            end
+        end
+    end        
+end
 %% Selecting Figure Settings
 % Baseline before user changes.
 view_perspective = [20, 45];
@@ -318,7 +393,7 @@ incl_dist = true;
 clear Prompt DefAns Name formats Options
 
 fprintf('Changing figure settings...\n')
-uiwait(msgbox('It will take time to load the bone and correspondence models, thanks for your patience!'))
+% uiwait(msgbox('It will take time to load the bone and correspondence models, thanks for your patience!'))
 close all
 done_selecting = 0;
 
@@ -361,7 +436,8 @@ bead_color = [0.85 0.85 0.85];
 fig_set_name = [];
 MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\',data_dir)));
 if isequal(isempty(MF),0)
-    prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
+    prev_fig_set = listdlg('ListString',{'Yes','No'},'Name','Would you like to load a previous figure setting?','ListSize',[750 50],'SelectionMode','single');
+    % prev_fig_set = menu("Would you like to load a previous figure setting?","Yes","No");
     if isequal(prev_fig_set,1)
         fig_set_name = uigetfile(sprintf('%s\\Outputs\\JMA_03_Outputs\\*.mat',data_dir));
         load(sprintf('%s\\Outputs\\JMA_03_Outputs\\%s',data_dir,fig_set_name));
@@ -386,8 +462,8 @@ while isequal(set_change,1)
     % RainbowFish_Stitch(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle)
 
     RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
-
-    set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
+    set_change = listdlg('ListString',{'Yes (modify)','No (proceed)','No (save settings and proceed)'},'Name','Would you like to load a previous figure setting?','ListSize',[750 50],'SelectionMode','single');
+    % set_change = menu("Would you like to change the figure settings?","Yes (modify)","No (proceed)","No (save settings and proceed)");
     if isequal(set_change,1)
         clear Prompt formats DefAns
         Options.Resize = 'on';
@@ -597,6 +673,27 @@ if isequal(colormap_choice,"difference")
         listdata{n} = char(sprintf('%s %s',num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
         listname{1,n} = char(sprintf('%s (min = %s , max = %s)',listname{1,n},num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
     end
+elseif stats_type == 5
+    for n = inpdata
+        listname{1,n} = char(g(n));
+        clear U_temp
+        
+        mcomp_gt = [];
+        for b = 1:bone_amount
+            mcomp_gt = [mcomp_gt; Bone_Data{b}.DataOutAll.(g{inpdata_groundtruth})];
+        end
+        mcomp = [];
+        for b = 1:bone_amount
+            mcomp = [mcomp; Bone_Data{b}.DataOutAll.(string(g(n)))];
+        end 
+        
+        mcomp_diff = (mean(mcomp) - mean(mcomp_gt)/mean(mcomp_gt))*100;
+        mcomp_std  = max([std(mcomp),std(mcomp_gt)])*100;
+        % listdata{n} = char(sprintf('%s %s',num2str(0,'%.2f'),num2str(mcomp_diff + mcomp_std*2,'%.2f')));
+        % listname{1,n} = char(sprintf('Percentage Error (%s \x00B1 %s)',num2str(mcomp_diff,'%.2f'),num2str(mcomp_std*2,'%.2f')));
+        listdata{n}     = char(sprintf('%s %s',num2str(0,'%.0f'),num2str(100,'%.0f')));
+        listname{1,n}   = char('Percentage Error'); %(%s \x00B1 %s)',num2str(0,'%.0f'),num2str(100,'%.0f')));
+    end
 else
     for n = inpdata
         listname{1,n} = char(g(n));
@@ -669,7 +766,7 @@ Distance_Lower = str2double(cell2mat(temp(1)));
 
 fprintf('Processing...\n')
 
-%% ANOVA or t-Tests
+%% Statistical Analyses
 if isequal(stats_type,1)
     %% Find number of Correspondence Particles
     g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
@@ -717,60 +814,74 @@ if isequal(stats_type,1)
                         if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
                             %% Student's t-Test or Wilcoxon Rank Sum
-                            if n == 1 && m == 1
-                                fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
-                            end
-                            test_type = 1;
-                            [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
-                            % Student's t-test
-                            % Wilcoxon rank sum test
-                            [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
-
-                            if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
-                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)];% Shapiro-Wilk Normality test
+                            if stats1_type == 1
+                                if n == 1 && m == 1
+                                    fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
+                                end
+                                test_type = 1;
+                                % Student's t-test
+                                [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
+                                
+                                % Wilcoxon rank sum test
+                                [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
+    
+                                if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                end
                             end
 
                             %% Hotelling's T2 Test
-                            % if n == 1 && m == 1
-                            %     fprintf('Multivariate Hotelling''s T^2 Test\n')
-                            % end
-                            % clear data
-                            % data{1} = statdata.(data_1);
-                            % data{2} = statdata.(data_2);
-                            % p_value = HotellingT2_1D(data,pool);
-                            % 
-                            % if isempty(p_value) == 0
-                            %     NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value, 1, norm_test(8,3)];% Shapiro-Wilk Normality test
-                            % end
+                            if stats1_type == 3
+                                if n == 1 && m == 1
+                                    fprintf('Multivariate Hotelling''s T^2 Test\n')
+                                end
+                                test_type = 1;
+                                data = cell(1,1);
+                                for id_t = 1:size(statdata.(data_1),2)
+                                    data{1}{id_t} = statdata.(data_1)(id_t);
+                                end
+                                for id_t = 1:size(statdata.(data_2),2)
+                                    data{2}{id_t} = statdata.(data_2)(id_t);
+                                end
+                                pool.IdleTimeout    = 360;
+                                p_value_hot         = Compute_PValue_Group_Difference(data,alpha_val,pool);
+    
+                                if ~isempty(p_value_hot)
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value_hot, p_value_hot, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                end                                
+                                clear data
+                            end
 
                         elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
                             if isempty(data_all) == 0 && isempty(agrp_id) == 0
-                                if n == 1 && m == 1
-                                    fprintf('One-way ANOVA or Kruskal-Wallis\n')   
-                                end
-                                test_type = 2;
-                                clear p_parametric p_nonparametric
-                                [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
-                                [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
-                                
-                                if comp_flip == 0
-                                    c = multcompare(pd_parametric,'display','off');
-                                    p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                        
-                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                    p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
-                                elseif comp_flip == 1
-                                    c = multcompare(pd_parametric,'display','off');
-                                    p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                        
-                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                    p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
-                                end
+                                if stats1_type == 2
+                                    if n == 1 && m == 1
+                                        fprintf('One-way ANOVA or Kruskal-Wallis\n')   
+                                    end
+                                    test_type = 2;
+                                    clear p_parametric p_nonparametric
+                                    [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
+                                    [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
+                                    
+                                    if comp_flip == 0
+                                        c = multcompare(pd_parametric,'display','off');
+                                        p_parametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
                             
-                                NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
-                                if norm_test(8,3) == 0
-                                    not_normal.(g{g_count}) = 0;
+                                        c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                        p_nonparametric = c(find(c(:,1) == comparison(1) & c(:,2) == comparison(2)),6);
+                                    elseif comp_flip == 1
+                                        c = multcompare(pd_parametric,'display','off');
+                                        p_parametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                            
+                                        c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                        p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
+                                    end
+                                
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
+                                    if norm_test(8,3) == 0
+                                        not_normal.(g{g_count}) = 0;
+                                    end
                                 end
                             end
                         end 
@@ -804,7 +915,7 @@ if isequal(stats_type,2)
     gg = fieldnames(Bone_Data{1}.DataOut_SPM.(string(g(1))));
     for g_count = inpdata
         for bone_count = 1:bone_amount
-            fprintf('Processing Bone: %s\n',string(Bone_Data{bone_count}.bone_names(1)))
+            fprintf('Processing Bone (%s): %s\n',g{g_count},string(Bone_Data{bone_count}.bone_names(1)))
             reg_sig.(g{g_count}){bone_count} = {};
             for n = 1:min([length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1))) length(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_2)))])
                 clear section1 section2 pperc_stance
@@ -866,7 +977,7 @@ if isequal(stats_type,2)
 end
 
 %% Group Results (no stats) or Individual Results (no stats)
-if isequal(stats_type,3) || isequal(stats_type,4)
+if isequal(stats_type,3) || isequal(stats_type,4) || isequal(stats_type,5)
     reg_sig = [];
 end
 
@@ -887,10 +998,10 @@ if isequal(stats_type,1)
     end
 elseif isequal(stats_type,2)
     test_name = 'SPM';
-elseif isequal(stats_type,3)
+elseif isequal(stats_type,3) || isequal(stats_type,5)
     test_name = 'Group';
 elseif isequal(stats_type,4)
-    test_name = 'Individual';
+    test_name = 'Individual';    
 end
 
 plot_data_name = fieldnames(Bone_Data{1,1}.DataOut);
@@ -1035,10 +1146,25 @@ if stats_type < 3
                     NodalIndex{bone_count}  = [];
                     NodalData{bone_count}   = [];
                     for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(:,1))
+                        % Checks that the distance at the particle is
+                        % within the limits for both groups, if so it will
+                        % be included in the figure
                         if Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) > Distance_Lower && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1))(m,n) <= Distance_Upper && Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_2))(m,n) <= Distance_Upper
-                            NodalIndex{bone_count}(k,:) = m;
-                            NodalData{bone_count}(k,:)  = Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n);
-                            k = k + 1;
+                            % Checks that the number of data mapped at the
+                            % particle is equal to the total number of
+                            % subjects in each respective group. This is so
+                            % that what is being shown in the figure is
+                            % only the correspondence particles where SPM
+                            % was conducted on them. That way there is no
+                            % misrepresenting the data.
+                            if length(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(plot_data_name(plot_data))).(string(data_1)){m,n})) == ...
+                                    length(Bone_Data{bone_count}.subj_group.(string(data_1)).SubjectList) && ...
+                                length(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(string(plot_data_name(plot_data))).(string(data_2)){m,n})) == ...
+                                length(Bone_Data{bone_count}.subj_group.(string(data_2)).SubjectList)
+                                NodalIndex{bone_count}(k,:) = m;
+                                NodalData{bone_count}(k,:)  = Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(string(data_1))(m,n);
+                                k = k + 1;
+                            end
                         end
                     end
 
@@ -1126,7 +1252,11 @@ if stats_type == 3
                     temp = [];
                     temp_display = [];                    
                     
-                    perc_stance = Bone_Data{1,1}.perc_stance;
+                    % perc_stance = Bone_Data{1,1}.perc_stance;
+                    perc_stance = Bone_Data{1,1}.perc_stance(n);
+                    if Bone_Data{1}.max_frames == 1
+                        perc_stance = [];
+                    end                    
                     NodalIndex{bone_count}  = {};
                     NodalData{bone_count}   = {};
                     SPM_index{bone_count}   = [];
@@ -1165,7 +1295,7 @@ if stats_type == 3
                     fprintf('%s\n',string(n))
                     figure()    
                     RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
-                        ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
+                        ColorMap_Flip,SPM_index,floor(perc_stance),...
                         view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
         
                     saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,data_1{1},n));
@@ -1228,7 +1358,11 @@ if stats_type == 4
                         MeanCP{bone_count}      = MeanCP_Ind.(string(data_1(subj_count))){bone_count};
                         
                         k = 1;
-                        perc_stance = Bone_Data{1,1}.perc_stance;
+                        % perc_stance = Bone_Data{1,1}.perc_stance;
+                        perc_stance = Bone_Data{1,1}.perc_stance(n);
+                        if Bone_Data{1}.max_frames == 1
+                            perc_stance = [];
+                        end                        
                         NodalIndex{bone_count}  = {};
                         NodalData{bone_count}   = {};
                         SPM_index{bone_count}   = [];
@@ -1259,7 +1393,7 @@ if stats_type == 4
                         fprintf('%s\n',string(n))
                         figure()    
                         RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
-                            ColorMap_Flip,SPM_index,floor(Bone_Data{1}.perc_stance(n)),...
+                            ColorMap_Flip,SPM_index,floor(perc_stance),...
                             view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
             
                         saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,string(data_1(subj_count)),n));
@@ -1286,5 +1420,152 @@ if stats_type == 4
     end
 end
 
+%%
+if stats_type == 5
+    subj_group = Bone_Data{bone_count}.subj_group;
+    for plot_data = inpdata    
+            tif_folder = [];
+            N_length = [];
+
+            for n = 1:Bone_Data{1}.max_frames
+                %% Create directory to save .tif images
+                    tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
+                        ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
+                        'Error',data_1{1});
+    
+                if n == 1
+                    disp(tif_folder)
+                    fprintf('%s: \n',data_1{1})
+        
+                    % Create directory to save results
+                    mkdir(tif_folder);
+                end
+                %% Limits
+                ColorMap_Flip   = cell2mat(cmapflip(plot_data));
+                U               = cell2mat(upper_limit(plot_data));
+                L               = cell2mat(lower_limit(plot_data));
+                
+                perc_stance = Bone_Data{1,1}.perc_stance(n);
+                if Bone_Data{1}.max_frames == 1
+                    perc_stance = [];
+                end
+
+                for bone_count = 1:bone_amount
+                    temp = [];
+                    temp_display = [];                    
+                    
+                    NodalIndex{bone_count}  = {};
+                    NodalData{bone_count}   = {};
+                    SPM_index{bone_count}   = [];
+
+                    k = 1;
+                    for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(string(plot_data_name(plot_data))).(data_1{1})(:,1))
+                        data_cons1 = [];
+                        datd_cons1 = [];
+                        ss = 1;
+                        for s = 1:length(subj_group.(data_1{1}).SubjectList)
+                            if isempty(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1{1}).SubjectList(s))){m,n}) == 0
+                                A = Bone_Data{bone_count}.DataOut.(string(plot_data_name(inpdata_groundtruth))).(string(subj_group.(data_1{1}).SubjectList(s))){m,n};
+                                E = Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(subj_group.(data_1{1}).SubjectList(s))){m,n};
+                                if A ~= 0
+                                    data_cons1(ss) = abs(((E-A)/A)*100); % Percentage Error Calculation
+                                elseif A == 0 % Insert relative error calculation here
+                                    data_cons1(ss) = 0;
+                                end
+                                datd_cons1(ss) = Bone_Data{bone_count}.DataOut.Distance.(string(subj_group.(data_1{1}).SubjectList(s))){m,n};
+                                ss = ss + 1;
+                            end
+                        end                    
+            
+                        if isempty(datd_cons1) == 0
+                            if mean(datd_cons1) <= Distance_Upper && mean(datd_cons1) >= Distance_Lower ...
+                                    && length(data_cons1) >= floor(length(subj_group.(data_1{1}).SubjectList)*(perc_part(1)/100))
+                                temp(k,:) = [m mean(data_cons1)];
+                                k = k + 1;
+                            end
+                        end
+                    end
+                    if isempty(temp) == 0
+                        NodalData{bone_count}   = temp(:,2);
+                        NodalIndex{bone_count}  = temp(:,1);
+                    end
+                end
+    
+                %% Create figure and save as .tif
+                mean(NodalData{1,1})
+                std(NodalData{1,1})
+                CLimits = [L U];
+                vis_toggle = 0;
+                if isempty(NodalData{1}) == 0
+                    fprintf('%s\n',string(n))
+                    figure()    
+                    RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,...
+                        ColorMap_Flip,SPM_index,floor(perc_stance),...
+                        view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
+        
+                    saveas(gcf,sprintf('%s\\%s_%d.tif',tif_folder,data_1{1},n));
+                    N_length = [N_length n];
+                end
+            end
+        close all
+        clear NodalData NodalIndex
+        
+        if Bone_Data{1}.max_frames > 1
+            fprintf('Creating video...\n')
+            video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s.mp4',...
+                data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
+                data_1{1})); % Create the video object.
+            video.FrameRate = frame_rate;
+            open(video); % Open the file for writing
+            for N = N_length
+                I = imread(fullfile(tif_folder,sprintf('%s_%d.tif',data_1{1},N))); % Read the next image from disk.
+                writeVideo(video,I); % Write the image to file.
+            end
+            close(video);
+        end
+    end
+    close all
+    clear NodalData NodalIndex
+    
+    if Bone_Data{1}.max_frames > 1
+        fprintf('Creating video...\n')
+        video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s.mp4',...
+            data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
+            string(groups(comparison(1))),string(groups(comparison(2))))); % Create the video object.
+        video.FrameRate = frame_rate;
+        open(video); % Open the file for writing
+        for N = N_length
+            I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+            writeVideo(video,I); % Write the image to file.
+        end
+        close(video); 
+    end
+end
+
+
+%%
 disp(view_perspective)
 fprintf('Complete!\n')
+
+%%
+if Bone_Data{1}.max_frames == 1
+    group_names = fieldnames(Bone_Data{1,1}.subj_group);
+    
+    M = cell(1,1);
+    SD = cell(1,1);
+    X = cell(1,1);
+    V = cell(1,1);
+    for g_count = 1:length(group_names)
+        %%
+        g = Bone_Data{1,1}.subj_group.(group_names{g_count}).SubjectList;
+        X{g_count} = [];
+        for subj_count = 1:length(g)
+            X{g_count} = [X{g_count}; cell2mat(Bone_Data{1,1}.DataOut.Distance.(g{subj_count}))];
+        end
+    
+        M{g_count}  = mean(X{g_count});
+        SD{g_count} = std(X{g_count});
+        V{g_count}  = var(X{g_count});  
+        
+    end
+end

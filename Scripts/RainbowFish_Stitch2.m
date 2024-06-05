@@ -321,7 +321,7 @@ for bone_count = 1:bone_amount
     
     k = 1;
     for cp_count = 1:length(NodalIndex{bone_count}(:,1))
-        if NodalData{bone_count}(cp_count,:) >=  CLimits(1) && NodalData{bone_count}(cp_count,:) <= CLimits(2)
+        % if NodalData{bone_count}(cp_count,:) >=  CLimits(1) && NodalData{bone_count}(cp_count,:) <= CLimits(2)
             % check if significant
             temp_p = find(NodalIndex{bone_count}(cp_count,:) == SPMIndex{bone_count});
             
@@ -374,7 +374,7 @@ for bone_count = 1:bone_amount
                 end
             end
         end
-    end
+    % end
 end
 close
 
@@ -389,7 +389,7 @@ for bone_count = 1:bone_amount
     B.faces        = MeanShape{bone_count}.ConnectivityList;
     B.vertices     = MeanShape{bone_count}.Points;
         patch(B,'FaceColor', bone_color, ... % [0.85 0.85 0.85][0.8902 0.8549 0.7882]
-        'EdgeColor','none',...        
+        'EdgeColor','none',...    %[0 0 0],... %'none',...   
         'FaceLighting','gouraud',...
         'AmbientStrength', 0.15,...
         'facealpha',bone_alph{bone_count});
@@ -429,8 +429,10 @@ elseif isequal(colormap_choices,'other')
 % elseif ColorMap_Flip == 2 && isequal(colormap_choices,'other')
 %     colormap(flipud(ColorMap2))    
 end
-ttl = title(sprintf('%d %%',perc_stance));
-ttl.FontSize = 32;
+if ~isempty(perc_stance)
+    ttl = title(sprintf('%d %%',perc_stance));
+    ttl.FontSize = 32;
+end
 C = colorbar;
 C.FontSize = 32;
 clim([CLimits(1,1),CLimits(1,2)])

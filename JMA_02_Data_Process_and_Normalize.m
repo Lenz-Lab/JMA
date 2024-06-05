@@ -12,39 +12,45 @@
 % Notes: 
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 addpath(sprintf('%s\\Scripts',pwd))
 
 %% User Inputs
 Options.Resize = 'on';
 Options.Interpreter = 'tex';
 
-Prompt(1,:)             = {'Enter name of the bone that data will be mapped to (visualized on):','Bone1',[]};
-DefAns.Bone1            = 'Calcaneus';
+Prompt(1,:)             = {'Appended name to output file','AppendName',[]};
+DefAns.AppendName       = '';
 formats(1,1).type       = 'edit';
 formats(1,1).size       = [100 20];
 
-Prompt(2,:)             = {'Enter name of opposite bone:','Bone2',[]};
-DefAns.Bone2            = 'Talus';
+Prompt(2,:)             = {'Enter name of the bone that data will be mapped to (visualized on):','Bone1',[]};
+DefAns.Bone1            = 'Calcaneus';
 formats(2,1).type       = 'edit';
 formats(2,1).size       = [100 20];
 
-Prompt(3,:)             = {'Enter number of study groups:','GrpCount',[]};
-DefAns.GrpCount         = '1';
+Prompt(3,:)             = {'Enter name of opposite bone:','Bone2',[]};
+DefAns.Bone2            = 'Talus';
 formats(3,1).type       = 'edit';
 formats(3,1).size       = [100 20];
 
-Prompt(4,:)             = {'Troubleshoot? (verify correspondence particles)','TrblShoot',[]};
-DefAns.TrblShoot        = false;
-formats(4,1).type       = 'check';
+Prompt(4,:)             = {'Enter number of study groups:','GrpCount',[]};
+DefAns.GrpCount         = '1';
+formats(4,1).type       = 'edit';
 formats(4,1).size       = [100 20];
+
+Prompt(5,:)             = {'Troubleshoot? (verify correspondence particles)','TrblShoot',[]};
+DefAns.TrblShoot        = false;
+formats(5,1).type       = 'check';
+formats(5,1).size       = [100 20];
 
 
 set_inp = inputsdlg(Prompt,'User Inputs',formats,DefAns,Options);
 
-bone_names = {set_inp.Bone1,set_inp.Bone2};
-study_num = str2double(set_inp.GrpCount);
-troubleshoot_mode = set_inp.TrblShoot;
+bone_names          = {set_inp.Bone1,set_inp.Bone2};
+study_num           = str2double(set_inp.GrpCount);
+troubleshoot_mode   = set_inp.TrblShoot;
+append_name         = set_inp.AppendName;
 
 uiwait(msgbox('Please select the directory where the data is located'))
 data_dir = string(uigetdir());
@@ -150,6 +156,10 @@ fprintf('Normalizing data...\n')
 for subj_count = 1:length(subjects)
     if isfield(Data.(subjects{subj_count}),'Event') == 1
         frames = Data.(subjects{subj_count}).Event;
+        % Fixed so it goes to length of the activity.
+        if isequal(Data.(subjects{subj_count}).Event,[1 1 1 1])
+            frames = [1 1 length(fieldnames(Data.(subjects{subj_count}).MeasureData)) length(fieldnames(Data.(subjects{subj_count}).MeasureData))];
+        end        
     elseif isfield(Data.(subjects{subj_count}),'Event') == 0
         frames = [1 1 1 1];
         if length(fieldnames(Data.(subjects{subj_count}).MeasureData)) > 1
@@ -207,13 +217,13 @@ for n = 1:length(subjects)
         data.(subjects{n}).CP.(f{m})(:,1) = Data.(subjects{n}).MeasureData.(f{m}).Pair(:,1);
         g = fieldnames(Data.(subjects{n}).MeasureData.(f{m}).Data);
 
-        if n == 1
-            gn = g;
-        end
+        % if n == 1
+        %     gn = g;
+        % end
 
-        for k = 1:length(gn)
-            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(gn{k})(:,1))
-                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(gn{k})(p,1);
+        for k = 1:length(g)
+            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1))
+                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
                 nan_temp(isnan(nan_temp)) = 0;
                 data.(subjects{n}).CP.(f{m})(p,k+1) = nan_temp;
             end           
@@ -244,7 +254,8 @@ for n = 1:length(subjects)
     else
         IntData.(subjects{n}).Frame(:,1) = 1;
     end    
-        
+    
+    g = fieldnames(Data.(subjects{n}).MeasureData.(f{1}).Data);
     for CItoDist = 1:length(g)
         temp = cell(1,length(data.(subjects{n}).Frame(:,1)));
         for m = 1:length(data.(subjects{n}).Frame(:,1))
@@ -352,10 +363,12 @@ end
 
 %%
 close all
-clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode
+clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode append_name
 
 %% Calculate Mean Congruence and Distance at Each Common Correspondence Particle
 fprintf('Calculating Mean Data... \n')
+
+DataOut_SPM = [];
 
 g = fieldnames(subj_group);
 for study_pop = 1:length(g)
@@ -367,11 +380,15 @@ for study_pop = 1:length(g)
     for CItoDist = 1:length(gg)
         for n = 1:MeanCP
             for m = 1:max_frames
-                temp = [];        
+                temp = [];
+                ss = 1;
                 for s = 1:length(subjects)
-                    t = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
-                    if isempty(cell2mat(t)) == 0
-                        temp(s,:) = cell2mat(t);
+                    if isfield(DataOut.(gg{CItoDist}),subjects{s})
+                        t = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
+                        if isempty(cell2mat(t)) == 0
+                            temp(ss,:) = cell2mat(t);
+                            ss = ss + 1;
+                        end
                     end
                 end
                 DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = 0;
@@ -525,6 +542,9 @@ temp_name = '';
 for n = 1:length(g)
     temp_n = sprintf('_%s',string(g(n)));
     temp_name = strcat(temp_name,temp_n);
+end
+if ~isequal(append_name,'')
+    temp_name = strcat(temp_name,'_',append_name);
 end
 
 writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',bone_names{1},bone_names{2},temp_name)));

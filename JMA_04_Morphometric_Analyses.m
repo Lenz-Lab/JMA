@@ -196,6 +196,7 @@ NodalIndex{1}       = (1:length(MeanCP{1}(:,1)))';
 
 cl = round(max(abs([min(NodalData) max(NodalData)])),1,TieBreaker = 'plusinf');
 view_perspective = [20 45];
+colormap_choice     = 'rudifference';
 
 %% User Inputs
 clear Prompt DefAns Name formats Options
@@ -235,15 +236,39 @@ DefAns.DistMap      = true;
 formats(8,1).type   = 'check';
 formats(8,1).size   = [100 20];
 
-Prompt(9,:)         = {'Alpha Value (\alpha): ','AlphaValue',[]};
-DefAns.AlphaValue   = '0.05';
-formats(9,1).type   = 'edit';
+Prompt(9,:)         = {'Colormap:','CMap',[]};
+formats(9,1).type   = 'list';
+formats(9,1).style  = 'popupmenu';
 formats(9,1).size   = [100 20];
+formats(9,1).items  = {'difference','prinsenvlag','jet','autumn','parula','hot','gray','pink','arctic','type in your own'};
+
+Prompt(10,:)        = {'Flip colormap? (only if distance data is included)','FMap',[]};
+DefAns.DistMap      = false;
+formats(10,1).type   = 'check';
+formats(10,1).size   = [100 20];
+
+Prompt(11,:)         = {'Alpha Value (\alpha): ','AlphaValue',[]};
+DefAns.AlphaValue    = '0.05';
+formats(11,1).type   = 'edit';
+formats(11,1).size   = [100 20];
+
+Prompt(12,:)        = {'Append to name of file:','AppendName',[]};
+DefAns.AppendName   = '';
+formats(12,1).type   = 'edit';
+formats(12,1).size   = [100 20];
 
 Name                = 'Change figure settings';
 set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
 
-alpha_val = str2double(set_inp.AlphaValue);
+alpha_val       = str2double(set_inp.AlphaValue);
+append_name     = set_inp.AppendName;
+colormap_flip   = set_inp.FMap;
+
+colormap_choice = string(formats(9,1).items(set_inp.CMap));
+if isequal(colormap_choice,"type in your own")
+% if isequal(set_inp.CMap,length(formats(5,1).items))
+    colormap_choice = string(inputdlg({'Input Colormap Name:'},'Colormap',[1 50],{''}));
+end 
 
 % Pull data out
 load_prev           = set_inp.PerspLoad;
@@ -268,7 +293,9 @@ circle_color{4}     = set_inp.BoneColor;
 incl_dist           = set_inp.DistMap;
 
 p_test = 1;
-colormap_choice     = 'rudifference';
+if isequal(colormap_choice,'difference')
+    colormap_choice     = 'rudifference';
+end
 
 %% ICP Alignment
 data_aligned    = cell(1,1);
@@ -281,36 +308,10 @@ for grp_count = 1:2
     T = cell(1,1);
     data_aligned_temp = cell(1,1);
     parfor (subj_count = 1:length(data_unaligned{grp_count}),pool)
-    % for subj_count = 1:length(data_unaligned{grp_count})
-        % %% Error ICP
         ER_temp = zeros(12,1);
         ICP     = cell(12,1);
         RT      = cell(12,1);
-        Rt      = cell(12,1);
-        % for icp_count = 0:11
-        % % parfor (icp_count = 0:11,pool)
-        %     if icp_count < 4 % x-axis rotation
-        %         Rt{icp_count+1} = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
-        %     elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
-        %         Rt{icp_count+1} = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
-        %     elseif icp_count >= 8 % z-axis rotation
-        %         Rt{icp_count+1} = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
-        %     end
-        % 
-        %     P = Rt{icp_count+1}*data_unaligned{grp_count}{subj_count}';                 
-        % 
-        %     [R,T,ER] = icp(q,P,200,'Matching','kDtree');
-        %     P = (R*P + repmat(T,1,length(P)))';
-        %     % 
-        %     % figure()
-        %     % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
-        %     % hold on
-        %     % plot3(P(:,1),P(:,2),P(:,3),'.k')
-        %     % axis equal
-        % 
-        %     ER_temp(icp_count+1)   = min(ER);
-        %     ICP{icp_count+1}.P     = P;
-        % end        
+        Rt      = cell(12,1);     
 
         [R{subj_count}, T{subj_count}] = icp(q',data_unaligned{grp_count}{subj_count}',200,'Matching','kDtree');
         data_aligned_temp{subj_count} = (R{subj_count}*data_unaligned{grp_count}{subj_count}' + repmat(T{subj_count},1,length(data_unaligned{grp_count}{subj_count})))';
@@ -362,11 +363,12 @@ SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 %%
 if incl_dist
     stats_type = 1;
-    Figure_Out  = RainbowFish_Morph1(MeanCP,MeanShape{1},SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool);
+    Figure_Out  = RainbowFish_Morph1(MeanCP,MeanShape{1},SPMIndex,circle_color,glyph_size,NodalData,CLimits,colormap_choice,colormap_flip,pool);
 elseif ~incl_dist
     stats_type = 2;
     Figure_Out  = RainbowFish_Morph2(MeanCP,SPMIndex,circle_color,glyph_size,pool);
 end
+close all
 
 %%
 BoneSTL.faces       = MeanShape{1}.ConnectivityList;
@@ -377,9 +379,12 @@ Figure_Out.Title    = grp_name_A;
 RainbowFish_Plot(BoneSTL,Figure_Out,CLimits,view_perspective,stats_type)
 
 %% Save Figure
+if ~isequal(append_name,'')
+    append_name = strcat(append_name,'_');
+end
 tif_folder = sprintf('%s\\Results\\Morphometrics\\%s',data_dir,bone_names{1});
 mkdir(tif_folder)
-saveas(gcf,sprintf('%s\\%s_%s_vs_%s.tif',tif_folder,bone_names{1},grp_name_A,grp_name_B));
+saveas(gcf,sprintf('%s\\%s_%s%s_vs_%s.tif',tif_folder,bone_names{1},append_name,grp_name_A,grp_name_B));
 
 %%
 BoneSTL_NoPart.faces        = MeanShape{2}.ConnectivityList;
@@ -394,6 +399,6 @@ Figure_Out_NoPart.Title = grp_name_B;
 RainbowFish_Plot(BoneSTL_NoPart,Figure_Out_NoPart,CLimits,view_perspective,stats_type)
 
 %% Save Figure Comparison
-saveas(gcf,sprintf('%s\\%s_noStats_%s.tif',tif_folder,bone_names{1},grp_name_B))
+saveas(gcf,sprintf('%s\\%s%s_noStats_%s.tif',tif_folder,bone_names{1},append_name,grp_name_B))
 
 % fprintf(tif_folder)

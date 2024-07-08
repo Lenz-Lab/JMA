@@ -89,7 +89,7 @@ frame_rate          = set_inp.FrameRate;
 
 add_name            = string(set_inp.AppendName);
 
-%% This time with feeling...
+%% 
 P = stlread('Bead.stl');
 PP.Points = P.Points/max(max(P.Points));
 

@@ -5,5 +5,5 @@
 Toolbox for calculating joint measurements.
 
 ## Workflow
-![image](https://github.com/Lenz-Lab/JMA/assets/69816397/79ed7059-d475-4531-a017-49fc7eeb09d0)
+![JMA_Workflow](https://github.com/user-attachments/assets/61e2161b-e3a9-4342-91f2-40ce85ed5e20)
 

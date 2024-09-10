@@ -1763,19 +1763,19 @@ if stats_type == 5
     close all
     clear NodalData NodalIndex
     
-    if Bone_Data{1}.max_frames > 1
-        fprintf('Creating video...\n')
-        video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s.mp4',...
-            data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
-            string(groups(comparison(1))),string(groups(comparison(2))))); % Create the video object.
-        video.FrameRate = frame_rate;
-        open(video); % Open the file for writing
-        for N = N_length
-            I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
-            writeVideo(video,I); % Write the image to file.
-        end
-        close(video); 
-    end
+    % if Bone_Data{1}.max_frames > 1
+    %     fprintf('Creating video...\n')
+    %     video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s.mp4',...
+    %         data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
+    %         string(groups(comparison(1))),string(groups(comparison(2))))); % Create the video object.
+    %     video.FrameRate = frame_rate;
+    %     open(video); % Open the file for writing
+    %     for N = N_length
+    %         I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+    %         writeVideo(video,I); % Write the image to file.
+    %     end
+    %     close(video); 
+    % end
 end
 
 

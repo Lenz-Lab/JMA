@@ -242,8 +242,8 @@ formats(9,1).style  = 'popupmenu';
 formats(9,1).size   = [100 20];
 formats(9,1).items  = {'difference','prinsenvlag','jet','autumn','parula','hot','gray','pink','arctic','type in your own'};
 
-Prompt(10,:)        = {'Flip colormap? (only if distance data is included)','FMap',[]};
-DefAns.DistMap      = false;
+Prompt(10,:)         = {'Flip colormap? (only if distance data is included)','FMap',[]};
+DefAns.DistMap       = false;
 formats(10,1).type   = 'check';
 formats(10,1).size   = [100 20];
 
@@ -252,10 +252,16 @@ DefAns.AlphaValue    = '0.05';
 formats(11,1).type   = 'edit';
 formats(11,1).size   = [100 20];
 
-Prompt(12,:)        = {'Append to name of file:','AppendName',[]};
-DefAns.AppendName   = '';
-formats(12,1).type   = 'edit';
+Prompt(12,:)         = {'Use paired Hotelling''s T-squared Test:','PairedTest',[]};
+DefAns.PairedTest    = false;
+formats(12,1).type   = 'check';
 formats(12,1).size   = [100 20];
+
+
+Prompt(13,:)         = {'Append to name of file:','AppendName',[]};
+DefAns.AppendName    = '';
+formats(13,1).type   = 'edit';
+formats(13,1).size   = [100 20];
 
 Name                = 'Change figure settings';
 set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
@@ -263,6 +269,7 @@ set_inp             = inputsdlg(Prompt,Name,formats,DefAns,Options);
 alpha_val       = str2double(set_inp.AlphaValue);
 append_name     = set_inp.AppendName;
 colormap_flip   = set_inp.FMap;
+paired_test     = set_inp.PairedTest;
 
 colormap_choice = string(formats(9,1).items(set_inp.CMap));
 if isequal(colormap_choice,"type in your own")
@@ -356,7 +363,11 @@ end
 
 %%
 fprintf('Performing Hotelling''s T^2 Test...\n')
-p_value = Compute_PValue_Group_Difference(data_aligned,alpha_val,pool);
+if ~paired_test
+    p_value = Compute_PValue_Group_Difference(data_aligned,alpha_val,pool);
+elseif paired_test
+    p_value = Compute_Paired_PValue_Group_Difference(data_aligned);
+end
 
 SPMIndex{1} = NodalIndex{1}(p_value < alpha_val);
 

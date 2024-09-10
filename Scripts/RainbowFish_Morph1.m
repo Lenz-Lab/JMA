@@ -1,32 +1,4 @@
-function [Figure_Out]  = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_color,glyph_size,NodalData,CLimits,pool)
-% RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter)
-% This function creates a figure for joint space measurement data. This
-% function will take the input data and bin them into a distribution from
-% the input lower limit and upper limit (CLimits). The particle will be
-% colored as the mean value across the population at that particle
-% location. Additionally, the particles will be highlighted with a bright
-% pink disk around the particle denoting it as statistically significant
-% (95% confidence interval) at that location.
-% 
-% MeanShape     = loaded .stl from SSM
-% MeanCP        = loaded .particles from SSM
-% NodalIndex    = correspondence particle indices to have particles
-% NodalData     = data to graph on correspondence particle
-%   The indices for NodalIndex and NodalData much match.
-% CLimits       = [L U];
-%   L = lower limit
-%   U = upper limt
-% ColorMap_Flip - changes the colormap
-% ColorMap_Flip = 1 from blue to red, with blue being lowest values
-% ColorMap_Flip = 2 from red to blue, with red being lowest values
-% SPMIndex      = indices of which particles are statistically significant
-% perc_stance   = current percentage of stance (shown on figure)
-%   (requires Bead.stl and Disc.stl to work)
-% view_perspective = [20 45] adjusts the viewing perspective of the images
-%   example view([20 45])
-% colormap_choice = name of MATLAB colormap that you would like to use for
-%   nodal values
-
+function [Figure_Out]  = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_color,glyph_size,NodalData,CLimits,colormap_choice,colormap_flip,pool)
 %% Function Information
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group
@@ -38,43 +10,71 @@ function [Figure_Out]  = RainbowFish_Morph1(MeanCP,MeanShape,SPMIndex,circle_col
 
 %% Create Bin Structure
 clear S
-% Colors
-color_palette = [1/2 0 0;   % Deep red
-                 1 0 0;     % Red
-                 1 1 1;     % White
-                 0 0 1;     % Blue
-                 0 0 1/2];  % Deep blue
+%% Difference Colormap
+colormap_choices = 'difference';
+try
+    ColorMap2 = colormap(lower(colormap_choice));
+    close
+    if exist('ColorMap2','var')
+        colormap_choices = 'default';
+    end
+catch
 
-% Tony's Favorite
-% color_palette = [1 0 1;   % Deep red
-%                  1/2 0 1/2;     % Red
-%                  1 1 1;     % White
-%                  0 1/2 0;     % Blue
-%                  0 1 0];  % Deep blue
-
-m = 256;             
-% Compute distributions along the samples
-color_dist = cumsum([0 2/10 3/10 3/10 2/10]);
-color_samples = round((m-1)*color_dist)+1;
-% Make the gradients
-J = zeros(m,3);
-J(color_samples,:) = color_palette(1:5,:);
-diff_samples = diff(color_samples)-1;
-for d = 1:1:length(diff_samples)
-    if diff_samples(d)~=0
-        color1 = color_palette(d,:);
-        color2 = color_palette(d+1,:);
-        G = zeros(diff_samples(d),3);
-        for idx_rgb = 1:1:3
-            g = linspace(color1(idx_rgb), color2(idx_rgb), diff_samples(d)+2);
-            g([1, length(g)]) = [];
-            G(:,idx_rgb) = g';
+    load('slanCM_Data.mat');
+    
+    if ~isempty(find(string(fullNames) == colormap_choice))
+        for sland_i = 1:length(slandarerCM)
+            sland_temp = find(string(slandarerCM(sland_i).Names) == colormap_choice);
+            if ~isempty(sland_temp)
+                ColorMap2 = slandarerCM(sland_i).Colors{sland_temp};
+                if exist('ColorMap2','var')
+                    colormap_choices = 'other';
+                end                 
+                break
+            end
         end
-        J(color_samples(d)+1:color_samples(d+1)-1,:) = G;
+    end
+
+    if isequal(colormap_choice,'rudifference')
+        % Colors
+        color_palette = [1/2 0 0;   % Deep red
+                         1 0 0;     % Red
+                         1 1 1;     % White
+                         0 0 1;     % Blue
+                         0 0 1/2];  % Deep blue
+        
+        % Tony's Favorite
+        % color_palette = [1 0 1;   % Deep red
+        %                  1/2 0 1/2;     % Red
+        %                  1 1 1;     % White
+        %                  0 1/2 0;     % Blue
+        %                  0 1 0];  % Deep blue
+        
+        m = 256;             
+        % Compute distributions along the samples
+        color_dist = cumsum([0 2/10 3/10 3/10 2/10]);
+        color_samples = round((m-1)*color_dist)+1;
+        % Make the gradients
+        J = zeros(m,3);
+        J(color_samples,:) = color_palette(1:5,:);
+        diff_samples = diff(color_samples)-1;
+        for d = 1:1:length(diff_samples)
+            if diff_samples(d)~=0
+                color1 = color_palette(d,:);
+                color2 = color_palette(d+1,:);
+                G = zeros(diff_samples(d),3);
+                for idx_rgb = 1:1:3
+                    g = linspace(color1(idx_rgb), color2(idx_rgb), diff_samples(d)+2);
+                    g([1, length(g)]) = [];
+                    G(:,idx_rgb) = g';
+                end
+                J(color_samples(d)+1:color_samples(d+1)-1,:) = G;
+            end
+        end
+        ColorMap2 = flipud(J);
+        close
     end
 end
-ColorMap2 = flipud(J);
-close
 
 % Colormap length variable
 ML = length(ColorMap2(:,1));
@@ -99,6 +99,17 @@ while k <= ML
     k = k + 1;
 end    
 
+if colormap_flip
+    k = 0;
+    temp = zeros(length(ColorMap2(:,1)),3);
+    for n = 1:length(ColorMap2(:,1))
+        temp(n,:) = ColorMap2(end-k,:);
+        k = k + 1;
+    end
+clear ColorMap2
+ColorMap2 = temp;
+clear temp
+end 
 %% Nodal Data Index placement using Bins
 % Parallel for loop takes each data point from NodalData and pairs the index 
 % it with a ColorMap2 value (CMap output variable) using the previously

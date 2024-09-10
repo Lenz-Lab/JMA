@@ -12,7 +12,7 @@
 % Notes:
 
 %% Clean Slate
-clc; close all; clear
+clc; close all; clear;
 addpath(sprintf('%s\\Scripts',pwd))
 
 % Check if there is a parallel pool already
@@ -41,7 +41,7 @@ DefAns.AppendName   = '';
 formats(1,1).type   = 'edit';
 formats(1,1).size   = [100 20];
 if stats_type == 1
-    stats_types_names = {'Student''s t-Test','one-way ANOVA','Hotelling''s T^2'};
+    stats_types_names       = {'Two-Sample','Multi-Group','Hotelling''s T^2'};
     Prompt(end+1,:)         = {'Stats Type','StatType',[]};
     DefAns.StatType         = stats_types_names{1};
     formats(end+1,:).format = 'text';
@@ -62,6 +62,23 @@ if stats_type == 2 || stats_type == 3 || stats_type == 4 || stats_type == 5
     DefAns.FrameRate        = '20';
     formats(end+1,1).type   = 'edit';
     formats(end,1).size     = [50 20];
+
+    if stats_type == 4
+        norm_or_raw             = {'Normalized','Raw'};
+        % norm_raw = listdlg('ListString',,'Name','Would you like to see normalized or raw results? (dynamic)','ListSize',[750 50],'SelectionMode','single');
+        Prompt(end+1,:)         = {'Would you like to see normalized or raw results? (dynamic)','NormRaw',[]};
+        DefAns.NormRaw          = norm_or_raw{1};
+        formats(end+1,:).format = 'text';
+        formats(end,:).type     = 'list';
+        formats(end,:).style    = 'radiobutton';
+        formats(end,:).items    = norm_or_raw;
+        
+        % align_check_cell        = {'Yes','No'};
+        Prompt(end+1,:)          = {'Do the particles need aligned to the models?','PartAlign',[]};
+        DefAns.PartAlign        = false;
+        formats(end+1,:).type   = 'check';
+        % alignment_check = listdlg('ListString',{'Yes','No'},'Name','Do the particles need aligned to the models?','ListSize',[750 50],'SelectionMode','single');
+    end
 end
 
 if stats_type == 1 || stats_type == 3 || stats_type == 5
@@ -105,6 +122,15 @@ elseif stats_type == 1
     perc_part = [str2double(set_inp.Group1), str2double(set_inp.Group2)];
 end
 
+if stats_type == 4
+    for n = 1:size(norm_or_raw,2)
+        if isequal(norm_or_raw{n},set_inp.NormRaw)
+            norm_raw = n;
+        end
+    end
+    alignment_check = set_inp.PartAlign;
+end
+
 additional_name     = string(set_inp.AppendName);
 
 %% Number of Bones
@@ -142,7 +168,7 @@ t1 = 'Please select groups';
 
 if isequal(stats_type,1)
     %%
-    t2 = 'If two are selected (t-test or Wilcoxon rank sum)';
+    t2 = 'If two are selected (t-Test or Wilcoxon rank sum)';
     t3 = 'If more than two (one-way ANOVA or Kruskal-Wallis)';
     ma = 75;
     uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2]);sprintf([blanks(floor((ma-length(t3))/2)),t3])}))    
@@ -186,6 +212,26 @@ if stats_type <= 2
     if isequal(stats_type,1)
         combine_stats = listdlg('ListString',{'Yes','No'},'Name','Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','ListSize',[750 50],'SelectionMode','single');
         % combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
+        SPM_stats_perc = 0;
+    end
+    
+    if isequal(stats_type,2)
+        %% If SPM do you want regions?
+        SPM_stats_perc = listdlg('ListString',{'No','Yes'},'Name','Would you like to calculate percentage of particles over given regions? (requires .stl files of regions on mean shape surface)','ListSize',[750 50],'SelectionMode','single')-1;
+        if isequal(SPM_stats_perc,1)
+            SPM_region_amount = inputdlg({'How many regions would you like to load?'},'Load Regional Divisions',[1 50],{'1'});
+
+            BoneRegion = cell(1,str2double(SPM_region_amount));
+            for br = 1:str2double(SPM_region_amount)
+                if br == 1
+                    [region_file, region_dir] = uigetfile(sprintf('%s\\*.stl',data_dir));
+                    BoneRegion{br} = stlread(strcat(region_dir,region_file));
+                else
+                    [region_file, region_dir] = uigetfile(sprintf('%s\\*.stl',region_dir));
+                    BoneRegion{br} = stlread(strcat(region_dir,region_file));
+                end
+            end
+        end
     end
 
 elseif stats_type == 3 || stats_type == 5 % Group no stats 
@@ -203,10 +249,10 @@ elseif stats_type == 4 % Individual no stats
     temp = subj_group.(string(groups)).SubjectList;
     [indx,~] = listdlg('ListString',temp,'Name','Please select participant(s)','ListSize',[500 500]);
     
-    norm_raw = listdlg('ListString',{'Normalized','Raw'},'Name','Would you like to see normalized or raw results? (dynamic)','ListSize',[750 50],'SelectionMode','single');
+    % norm_raw = listdlg('ListString',{'Normalized','Raw'},'Name','Would you like to see normalized or raw results? (dynamic)','ListSize',[750 50],'SelectionMode','single');
     % norm_raw = menu('Would you like to see normalized or raw results? (dynamic)','Normalized','Raw');
 
-    alignment_check = listdlg('ListString',{'Yes','No'},'Name','Do the particles need aligned to the models?','ListSize',[750 50],'SelectionMode','single');
+    % alignment_check = listdlg('ListString',{'Yes','No'},'Name','Do the particles need aligned to the models?','ListSize',[750 50],'SelectionMode','single');
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
     Bone_Ind = cell(bone_amount,1);
@@ -308,12 +354,12 @@ if stats_type < 4 || stats_type == 5
     end
 elseif stats_type == 4
     %%
-    if alignment_check == 1
+    if alignment_check
         fprintf('Aligning bones to correspondence particles...\n')
     end
     for subj_count = 1:length(data_1)
         for bone_count = 1:bone_amount
-            if alignment_check == 1
+            if alignment_check
             bone_names                  = Bone_Data{bone_count}.bone_names;
             MeanCP_Ind.(data_1(subj_count)){bone_count} = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
             MeanShape1                  = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
@@ -362,7 +408,7 @@ elseif stats_type == 4
             MeanShape_Ind.(data_1(subj_count)){bone_count} = triangulation(MeanShape1.ConnectivityList,temp_MeanShape.Points);
 
 
-            elseif alignment_check == 2
+            elseif ~alignment_check
                 MeanCP_Ind.(data_1(subj_count)){bone_count}     = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).CP;
                 MeanShape_Ind.(data_1(subj_count)){bone_count}  = Bone_Ind{bone_count}.(string(data_1(subj_count))).Data.(string(data_1(subj_count))).(string(bone_names(1))).(string(bone_names(1)));
             end
@@ -1221,6 +1267,196 @@ if stats_type < 3
             end
             close(video); 
         end
+
+        %% Regions of Statistical Significance
+        if isequal(SPM_stats_perc,1) && isequal(stats_type,2)
+            fprintf('Calculating percentage of statistical significance in regions...\n')
+            % BoneRegion{1} = stlread(sprintf('%s\\Posterior_Facet.stl',data_dir));
+            % BoneRegion{2} = stlread(sprintf('%s\\Medial_Facet.stl',data_dir));
+            % BoneRegion{3} = stlread(sprintf('%s\\Anterior_Facet.stl',data_dir));
+
+            reg_tol = 0.5;
+            
+            i_Reg = cell(length(BoneRegion),1);
+            for br = 1:length(BoneRegion)
+                face1 = MeanCP{1};
+                surf2 = BoneRegion{br}.Points;
+
+                i_Reg1 = zeros(length(face1(:,1)),1);
+                parfor (h = 1:length(face1(:,1)),pool)
+                    ROI = find(surf2(:,1) >= face1(h,1)-reg_tol & surf2(:,1) <= face1(h,1)+reg_tol & surf2(:,2) >= face1(h,2)-reg_tol & surf2(:,2) <= face1(h,2)+reg_tol & surf2(:,3) >= face1(h,3)-reg_tol & surf2(:,3) <= face1(h,3)+reg_tol);
+                    if isempty(ROI) == 0
+                        i_Reg1(h,:) = h;
+                    end
+                end
+                i_Reg1(i_Reg1 ==  0) = [];
+                i_Reg{br} = i_Reg1;
+            end
+
+            %%
+            count_100_R = cell(length(BoneRegion),1);
+            for br = 1:length(BoneRegion)
+                count_100_R{br} = zeros(length(perc_stance),1);
+            end
+
+            count_100 = [];
+            for n = 1:Bone_Data{1}.max_frames
+                k = 1;
+                temp = [];
+                for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(:,1))           
+                    if Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(m,n) > 0
+                        temp(k,:) = [m Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(m,n)];
+                        k = k + 1;
+                    end
+                end
+                count_100(n,:) = length(temp(:,1));
+                
+                for br = 1:length(BoneRegion)
+                    for j = 1:length(temp(:,1))
+                        temp_R = find(i_Reg{br} == temp(j,1));
+                        if isempty(temp_R) == 0
+                            count_100_R{br}(n,:) = count_100_R{br}(n,:) + 1;
+                        end
+                    end
+                end
+            end
+
+            %% Collecting Data for Plots - Distance
+            PG = cell(1,1);
+            PG1 = cell(1,1);
+            for br = 1:length(BoneRegion)
+                PG1{br} = cell(1,1);
+            end
+
+            for n = 1:length(perc_stance)
+                PG{n,1} = perc_stance(n);
+                PG{n,2} = [];
+                
+                for br = 1:length(BoneRegion)
+                    PG1{br}{n,1} = perc_stance(n);
+                    PG1{br}{n,2} = [];
+                end
+            end
+
+            %%
+            for n = 1:length(reg_sigg)
+                temp = cell2mat(reg_sigg(n));
+                if isempty(temp) == 0
+                    start_end = [];
+                    for x = 1:length(temp(:,1))
+                        m1 = find(perc_stance == temp(x,1));
+                        m2 = find(perc_stance == temp(x,2));
+                        
+                        k = 1;
+                        t = [];
+                        p_check = perc_stance(m1:m2,:);
+                        for m = m1:m2
+                            t(k,:) = [Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(n,m) Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_2)(n,m)];
+                            if t(k,1) > Distance_Upper || t(k,2) > Distance_Upper
+                                p_check(k,:) = 0;
+                            end
+                            k = k + 1;
+                        end
+            
+                        k = 1;
+                        p_fill = {};
+                        for p = 1:length(p_check)
+                            if p_check(p,:) > 0
+                                p_fill{k,end+1} = p_check(p,:);
+                            end
+                            if p > 1 && p_check(p,:) == 0 && p_check(p-1,:) > 0
+                                k = k + 1;
+                            end    
+                        end
+                        
+                        if isempty(p_fill) == 0
+                            for p = 1:length(p_fill(:,1))
+                                temp_se = cell2mat(p_fill(p,:));
+                                start_end(end+1,:) = [temp_se(1) temp_se(end)];
+                            end
+                        end
+                    end
+                    
+                    reg_sig_per(n) = {start_end};
+                end
+            end
+            
+            temp_D = [];
+            m = 1;
+            for n = 1:length(reg_sig_per)
+                if isempty(cell2mat(reg_sig_per(n))) == 0
+                    temp_D{m,1} = n;
+                    temp_D{m,2} = reg_sig_per(n);
+                    m = m + 1;
+                end
+            end
+            
+            if isempty(temp_D) == 0
+                for n = 1:length(temp_D(:,1))
+                    temp = cell2mat(temp_D{n,2});
+                    for m = 1:length(perc_stance)
+                        for p = 1:length(temp(:,1))
+                            if perc_stance(m) >= temp(p,1) & perc_stance(m) <= temp(p,2)
+                                PG{m,2} = [PG{m,2}, temp_D{n,1}];
+                            end
+                        end
+                    end
+                end
+            end
+            
+            for n = 1:length(perc_stance)
+                for m = 1:length(PG{n,2})
+                    for br = 1:length(BoneRegion)
+                        temp = find(i_Reg{br}(:,1) == PG{n,2}(m));
+                        if isempty(temp) == 0
+                            PG1{br}{n,2} = [PG1{br}{n,2}, 1];
+                        end 
+                    end
+                end
+            end
+            
+            PG_count = cell(length(BoneRegion),1);
+            for n = 1:length(perc_stance)
+                for br = 1:length(BoneRegion)
+                    PG_count{br}(n,:) = length(PG1{br}{n,2});
+                end
+            end
+        
+            %% Saving Plots
+            SPM_perc_folder_name = sprintf('%s\\Results\\SPM_Percentages\\Perc_%s_%sv%s',data_dir,plot_data_name{plot_data},string(data_1),string(data_2));
+            status = mkdir(SPM_perc_folder_name);
+            clr_rd = colororder;
+            % clr_rd = ['b','r','g'];
+
+                figure('visible','off')
+                % figure()
+                set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694/2]);
+                stance = [perc_stance; flipud(perc_stance)];
+                for br = 1:length(BoneRegion)
+                    inBetween = [100*(PG_count{br}./count_100_R{br}); zeros(length(perc_stance),1)];
+                    legend_temp(br) = fill(stance,inBetween,clr_rd(br),'FaceAlpha',0.25);
+                    hold on
+                    plot(perc_stance,100*(PG_count{br}./count_100_R{br}),'color',clr_rd(br,:)); %clr_rd(br)); %
+                    hold on
+            
+                end
+            %     xline(perc_stance(n),'linewidth',4)
+            
+                temp_legend = {'Posterior Facet','Medial Facet','Anterior Facet'};
+                legend(legend_temp,temp_legend,'AutoUpdate','off')
+                ylim([0,50])
+                a = get(gca,'YTickLabel');
+                set(gca,'YTickLabel',a,'fontsize',15)
+                set(gca,'YTickLabelMode','auto')
+                xlabel('Percent Normalized Stance (%)','FontSize',25)
+                ylabel({'Percent of Statistically';'Significant Particles (%)';''},'FontSize',25)
+                
+                savefig(gcf,sprintf('%s\\SPM_Fig_%s_%sv%s.fig',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
+                saveas(gcf,sprintf('%s\\SPM_Reg_%s_%sv%s.tif',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
+                % savefig(gcf,sprintf('%s\\SPM_Fig_%s_%sv%s.fig',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
+             close all
+        end
+        %%
     end
 end
 
@@ -1527,19 +1763,19 @@ if stats_type == 5
     close all
     clear NodalData NodalIndex
     
-    if Bone_Data{1}.max_frames > 1
-        fprintf('Creating video...\n')
-        video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s.mp4',...
-            data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
-            string(groups(comparison(1))),string(groups(comparison(2))))); % Create the video object.
-        video.FrameRate = frame_rate;
-        open(video); % Open the file for writing
-        for N = N_length
-            I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
-            writeVideo(video,I); % Write the image to file.
-        end
-        close(video); 
-    end
+    % if Bone_Data{1}.max_frames > 1
+    %     fprintf('Creating video...\n')
+    %     video = VideoWriter(sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s.mp4',...
+    %         data_dir,test_name,string(plot_data_name(plot_data)),bone_comparison_name,string(plot_data_name(plot_data)),...
+    %         string(groups(comparison(1))),string(groups(comparison(2))))); % Create the video object.
+    %     video.FrameRate = frame_rate;
+    %     open(video); % Open the file for writing
+    %     for N = N_length
+    %         I = imread(fullfile(tif_folder,sprintf('%s_vs_%s_%d.tif',string(groups(comparison(1))),string(groups(comparison(2))),N))); % Read the next image from disk.
+    %         writeVideo(video,I); % Write the image to file.
+    %     end
+    %     close(video); 
+    % end
 end
 
 

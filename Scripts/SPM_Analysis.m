@@ -40,13 +40,13 @@ function [sig_stance] = SPM_Analysis(data1,name1,data2,name2,comparison,y_label,
 
 %% Which T-Test to Use
 % SPM Analysis - T-Test
-if comparison == 1
+if comparison == false
     spm       = spm1d.stats.ttest2(data1,data2);
     spmi      = spm.inference(alpha_val, 'two_tailed',true, 'interp',true);
 end
 
 % SPM Analysis - T-Test Paired
-if comparison == 2
+if comparison == true
     spm       = spm1d.stats.ttest_paired(data1,data2);
     spmi      = spm.inference(alpha_val, 'two_tailed',true, 'interp',true);
 end

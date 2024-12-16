@@ -41,7 +41,7 @@ DefAns.AppendName   = '';
 formats(1,1).type   = 'edit';
 formats(1,1).size   = [100 20];
 if stats_type == 1
-    stats_types_names       = {'Two-Sample','Multi-Group','Hotelling''s T^2'};
+    stats_types_names       = {'Two-Sample','Multi-Group'};%,'Hotelling''s T^2'};
     Prompt(end+1,:)         = {'Stats Type','StatType',[]};
     DefAns.StatType         = stats_types_names{1};
     formats(end+1,:).format = 'text';
@@ -55,6 +55,10 @@ if stats_type < 3
     DefAns.AlphaVal         = '0.05';
     formats(end+1,1).type   = 'edit';
     formats(end,1).size     = [50 20];
+
+    Prompt(end+1,:)         = {'Paired Data','Paired',[]};
+    DefAns.Paired           = false;
+    formats(end+1,1).type   = 'check';   
 end
 
 if stats_type == 2 || stats_type == 3 || stats_type == 4 || stats_type == 5
@@ -114,6 +118,7 @@ end
 alpha_val = 0.05;
 if stats_type < 3
     alpha_val       = str2double(set_inp.AlphaVal);
+    paired_data     = set_inp.Paired;
 end
 
 if stats_type == 3 || stats_type == 5
@@ -214,7 +219,8 @@ if stats_type <= 2
         % combine_stats = menu('Would you like to combine the statistical analyses onto the same plot? (parametric and nonparametric)','Yes','No');
         SPM_stats_perc = 0;
     end
-    
+
+    BoneRegion = cell(1,1);
     if isequal(stats_type,2)
         %% If SPM do you want regions?
         SPM_stats_perc = listdlg('ListString',{'No','Yes'},'Name','Would you like to calculate percentage of particles over given regions? (requires .stl files of regions on mean shape surface)','ListSize',[750 50],'SelectionMode','single')-1;
@@ -222,12 +228,15 @@ if stats_type <= 2
             SPM_region_amount = inputdlg({'How many regions would you like to load?'},'Load Regional Divisions',[1 50],{'1'});
 
             BoneRegion = cell(1,str2double(SPM_region_amount));
+            BoneRegionName = cell(1,str2double(SPM_region_amount));
             for br = 1:str2double(SPM_region_amount)
                 if br == 1
                     [region_file, region_dir] = uigetfile(sprintf('%s\\*.stl',data_dir));
+                    BoneRegionName{br} = strrep(region_file,'.stl','');
                     BoneRegion{br} = stlread(strcat(region_dir,region_file));
                 else
                     [region_file, region_dir] = uigetfile(sprintf('%s\\*.stl',region_dir));
+                    BoneRegionName{br} = strrep(region_file,'.stl','');
                     BoneRegion{br} = stlread(strcat(region_dir,region_file));
                 end
             end
@@ -865,11 +874,21 @@ if isequal(stats_type,1)
                                     fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
                                 end
                                 test_type = 1;
-                                % Student's t-test
-                                [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);                            
+                                if paired_data 
+                                    % paired-sample t-test
+                                    [~, pd_parametric] = ttest(statdata.(data_1),statdata.(data_2),alpha_val);
+                                elseif ~paired_data
+                                    % two-sample t-test
+                                    [~, pd_parametric] = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);
+                                end
                                 
-                                % Wilcoxon rank sum test
-                                [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
+                                if paired_data
+                                    % Signed rank test (paired)
+                                    [pd_nonparametric, ~, ~] = signrank(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
+                                elseif ~paired_data
+                                    % Wilcoxon rank sum test
+                                    [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
+                                end
     
                                 if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
                                     NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
@@ -1000,7 +1019,7 @@ if isequal(stats_type,2)
                             ss = 1;
                             for s = 1:length(section1)
                                 if length(section1{s}(1,:)) > 1
-                                    sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),1,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
+                                    sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
                                     if isempty(sig_stance) == 0
                                         reg_sig.(g{g_count}){bone_count}(n,:) = {[cell2mat(reg_sig.(g{g_count}){bone_count}(n,:)); sig_stance]};
                                     end
@@ -1009,7 +1028,7 @@ if isequal(stats_type,2)
                             end                   
                         else
                             perc_stance = Bone_Data{bone_count}.perc_stance;
-                            sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),1,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
+                            sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
                             if isempty(sig_stance) == 0
                                 reg_sig.(g{g_count}){bone_count}(n,:) = {sig_stance};
                                 clear data1 data2
@@ -1034,16 +1053,26 @@ if isequal(stats_type,1)
             test_name = 'RankSum';
         elseif isequal(test_type,2)
             test_name = 'KruskalWallis';
+        elseif isequal(test_type,3)
+            test_name = 'Combined';            
         end
     elseif isequal(normal_flag,1)
         if isequal(test_type,1)
             test_name = 'tTest';
+            if paired_data
+                test_name = strcat(test_name,'_paired');
+            end            
         elseif isequal(test_type,2)
             test_name = 'ANOVA';
+        elseif isequal(test_type,3)
+            test_name = 'Combined';
         end
     end
 elseif isequal(stats_type,2)
     test_name = 'SPM';
+    if paired_data
+        test_name = strcat(test_name,'_paired');
+    end
 elseif isequal(stats_type,3) || isequal(stats_type,5)
     test_name = 'Group';
 elseif isequal(stats_type,4)
@@ -1269,11 +1298,9 @@ if stats_type < 3
         end
 
         %% Regions of Statistical Significance
+        i_Reg = cell(1,1);
         if isequal(SPM_stats_perc,1) && isequal(stats_type,2)
             fprintf('Calculating percentage of statistical significance in regions...\n')
-            % BoneRegion{1} = stlread(sprintf('%s\\Posterior_Facet.stl',data_dir));
-            % BoneRegion{2} = stlread(sprintf('%s\\Medial_Facet.stl',data_dir));
-            % BoneRegion{3} = stlread(sprintf('%s\\Anterior_Facet.stl',data_dir));
 
             reg_tol = 0.5;
             
@@ -1292,141 +1319,12 @@ if stats_type < 3
                 i_Reg1(i_Reg1 ==  0) = [];
                 i_Reg{br} = i_Reg1;
             end
+            [PG_count, count_100_R] = RegionalStats(Bone_Data,bone_count,BoneRegion,i_Reg,reg_sigg,perc_stance,plot_data_name,plot_data,data_1,data_2,Distance_Upper);
 
-            %%
-            count_100_R = cell(length(BoneRegion),1);
-            for br = 1:length(BoneRegion)
-                count_100_R{br} = zeros(length(perc_stance),1);
-            end
-
-            count_100 = [];
-            for n = 1:Bone_Data{1}.max_frames
-                k = 1;
-                temp = [];
-                for m = 1:length(Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(:,1))           
-                    if Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(m,n) > 0
-                        temp(k,:) = [m Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(m,n)];
-                        k = k + 1;
-                    end
-                end
-                count_100(n,:) = length(temp(:,1));
-                
-                for br = 1:length(BoneRegion)
-                    for j = 1:length(temp(:,1))
-                        temp_R = find(i_Reg{br} == temp(j,1));
-                        if isempty(temp_R) == 0
-                            count_100_R{br}(n,:) = count_100_R{br}(n,:) + 1;
-                        end
-                    end
-                end
-            end
-
-            %% Collecting Data for Plots - Distance
-            PG = cell(1,1);
-            PG1 = cell(1,1);
-            for br = 1:length(BoneRegion)
-                PG1{br} = cell(1,1);
-            end
-
-            for n = 1:length(perc_stance)
-                PG{n,1} = perc_stance(n);
-                PG{n,2} = [];
-                
-                for br = 1:length(BoneRegion)
-                    PG1{br}{n,1} = perc_stance(n);
-                    PG1{br}{n,2} = [];
-                end
-            end
-
-            %%
-            for n = 1:length(reg_sigg)
-                temp = cell2mat(reg_sigg(n));
-                if isempty(temp) == 0
-                    start_end = [];
-                    for x = 1:length(temp(:,1))
-                        m1 = find(perc_stance == temp(x,1));
-                        m2 = find(perc_stance == temp(x,2));
-                        
-                        k = 1;
-                        t = [];
-                        p_check = perc_stance(m1:m2,:);
-                        for m = m1:m2
-                            t(k,:) = [Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_1)(n,m) Bone_Data{bone_count}.DataOut_Mean.(plot_data_name{plot_data}).(data_2)(n,m)];
-                            if t(k,1) > Distance_Upper || t(k,2) > Distance_Upper
-                                p_check(k,:) = 0;
-                            end
-                            k = k + 1;
-                        end
-            
-                        k = 1;
-                        p_fill = {};
-                        for p = 1:length(p_check)
-                            if p_check(p,:) > 0
-                                p_fill{k,end+1} = p_check(p,:);
-                            end
-                            if p > 1 && p_check(p,:) == 0 && p_check(p-1,:) > 0
-                                k = k + 1;
-                            end    
-                        end
-                        
-                        if isempty(p_fill) == 0
-                            for p = 1:length(p_fill(:,1))
-                                temp_se = cell2mat(p_fill(p,:));
-                                start_end(end+1,:) = [temp_se(1) temp_se(end)];
-                            end
-                        end
-                    end
-                    
-                    reg_sig_per(n) = {start_end};
-                end
-            end
-            
-            temp_D = [];
-            m = 1;
-            for n = 1:length(reg_sig_per)
-                if isempty(cell2mat(reg_sig_per(n))) == 0
-                    temp_D{m,1} = n;
-                    temp_D{m,2} = reg_sig_per(n);
-                    m = m + 1;
-                end
-            end
-            
-            if isempty(temp_D) == 0
-                for n = 1:length(temp_D(:,1))
-                    temp = cell2mat(temp_D{n,2});
-                    for m = 1:length(perc_stance)
-                        for p = 1:length(temp(:,1))
-                            if perc_stance(m) >= temp(p,1) & perc_stance(m) <= temp(p,2)
-                                PG{m,2} = [PG{m,2}, temp_D{n,1}];
-                            end
-                        end
-                    end
-                end
-            end
-            
-            for n = 1:length(perc_stance)
-                for m = 1:length(PG{n,2})
-                    for br = 1:length(BoneRegion)
-                        temp = find(i_Reg{br}(:,1) == PG{n,2}(m));
-                        if isempty(temp) == 0
-                            PG1{br}{n,2} = [PG1{br}{n,2}, 1];
-                        end 
-                    end
-                end
-            end
-            
-            PG_count = cell(length(BoneRegion),1);
-            for n = 1:length(perc_stance)
-                for br = 1:length(BoneRegion)
-                    PG_count{br}(n,:) = length(PG1{br}{n,2});
-                end
-            end
-        
-            %% Saving Plots
+            %% Saving Regional Significance Plots
             SPM_perc_folder_name = sprintf('%s\\Results\\SPM_Percentages\\Perc_%s_%sv%s',data_dir,plot_data_name{plot_data},string(data_1),string(data_2));
             status = mkdir(SPM_perc_folder_name);
             clr_rd = colororder;
-            % clr_rd = ['b','r','g'];
 
                 figure('visible','off')
                 % figure()
@@ -1438,10 +1336,10 @@ if stats_type < 3
                     hold on
                     plot(perc_stance,100*(PG_count{br}./count_100_R{br}),'color',clr_rd(br,:)); %clr_rd(br)); %
                     hold on
-            
+
                 end
             %     xline(perc_stance(n),'linewidth',4)
-            
+
                 temp_legend = {'Posterior Facet','Medial Facet','Anterior Facet'};
                 legend(legend_temp,temp_legend,'AutoUpdate','off')
                 ylim([0,50])
@@ -1450,13 +1348,63 @@ if stats_type < 3
                 set(gca,'YTickLabelMode','auto')
                 xlabel('Percent Normalized Stance (%)','FontSize',25)
                 ylabel({'Percent of Statistically';'Significant Particles (%)';''},'FontSize',25)
-                
-                savefig(gcf,sprintf('%s\\SPM_Fig_%s_%sv%s.fig',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
-                saveas(gcf,sprintf('%s\\SPM_Reg_%s_%sv%s.tif',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
-                % savefig(gcf,sprintf('%s\\SPM_Fig_%s_%sv%s.fig',SPM_perc_folder_name,plot_data_name{plot_data},string(data_1),string(data_2)))
-             close all
+
+                savefig(gcf,sprintf('%s\\%s_Fig_%s_%sv%s.fig',SPM_perc_folder_name,test_name,plot_data_name{plot_data},string(data_1),string(data_2)))
+                saveas(gcf,sprintf('%s\\%s_Reg_%s_%sv%s.tif',SPM_perc_folder_name,test_name,plot_data_name{plot_data},string(data_1),string(data_2)))
+                % close all            
         end
+
+        %% Calculate Effect Size
+        [Effect_Size, Effect_Size_All, Effect_Size_Region, cohen_hedge] = EffectSize(Bone_Data,bone_count,BoneRegion,i_Reg,subj_group,plot_data_name,plot_data);
+        [Stat_Distribution] = DistributionStats(Bone_Data,bone_count,BoneRegion,i_Reg,plot_data_name,plot_data,alpha_val);
+        
+        T = Stat_Distribution{1};
+        writetable(T,sprintf('%s\\Results\\%s_Distributions_%s_FullJoint.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name))
+        
+        group_names = fieldnames(Effect_Size_All{1}.(plot_data_name{plot_data}));
+        T = table();
+        T.GroupNames = group_names;
+        for table_count = 1:length(group_names)
+            T.(group_names{table_count}) = cell(length(group_names),1);
+        end
+
+        for group1_count = 1:length(gg)
+            for groupx_count = 1:length(gg)
+                if group1_count ~= groupx_count
+                    T.(group_names{group1_count}){groupx_count} = Effect_Size_All{1}.(plot_data_name{plot_data}).(gg{group1_count}).(gg{groupx_count});
+                end
+            end
+        end
+        writetable(T,sprintf('%s\\Results\\%s_EffectSize_%s_FullJoint.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name))
+        writecell({'Hedge g if: (n1 + n2) < 20','Cohen''s d = FALSE','Hedge''s g = TRUE'},sprintf('%s\\Results\\%s_EffectSize_%s_FullJoint.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name),'Range',sprintf('A%d',length(gg)+2))
+        writematrix(cohen_hedge,sprintf('%s\\Results\\%s_EffectSize_%s_FullJoint.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name),'Range',sprintf('B%d',length(gg)+3))        
+        
         %%
+        if ~isempty(BoneRegion{1})
+            for br = 1:length(BoneRegionName)
+                T = Stat_Distribution{br+1};
+                writetable(T,sprintf('%s\\Results\\%s_Distributions_%s_%s.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name,BoneRegionName{br}))
+
+                %%
+                gg = fieldnames(Effect_Size_Region{1}.(plot_data_name{plot_data}));
+                T = table();
+                T.GroupNames = group_names;
+                for table_count = 1:length(group_names)
+                    T.(group_names{table_count}) = cell(length(group_names),1);
+                end
+
+                for group1_count = 1:length(gg)
+                    for groupx_count = 1:length(gg)
+                        if group1_count ~= groupx_count
+                            T.(group_names{group1_count}){groupx_count} = Effect_Size_Region{1}.(plot_data_name{plot_data}).(gg{group1_count}).(gg{groupx_count}){br};
+                        end
+                    end
+                end
+                writetable(T,sprintf('%s\\Results\\%s_EffectSize_%s_%s.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name,BoneRegionName{br}))
+                writecell({'Hedge g if: (n1 + n2) < 20','Cohen''s d = FALSE','Hedge''s g = TRUE'},sprintf('%s\\Results\\%s_EffectSize_%s_%s.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name,BoneRegionName{br}),'Range',sprintf('A%d',length(gg)+2))
+                writematrix(cohen_hedge,sprintf('%s\\Results\\%s_EffectSize_%s_%s.xlsx',data_dir,plot_data_name{plot_data},bone_comparison_name,BoneRegionName{br}),'Range',sprintf('B%d',length(gg)+3))
+            end
+        end
     end
 end
 

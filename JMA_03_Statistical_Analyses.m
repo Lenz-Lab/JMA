@@ -314,20 +314,20 @@ if stats_type < 4 || stats_type == 5
     for bone_count = 1:bone_amount
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
         for c = 1:length(S)
-            temp = strsplit(S(c).name,'.');
-            temp = strrep(temp(1),' ','_');
-            temp = split(string(temp(1)),'_');
+            temp = strsplit(S(c).name,'.'); %remove the file extension
+            temp = strrep(temp(1),' ','_'); %replace spaces with _
+            temp = split(string(temp(1)),'_'); %split the underscores into pieces
         
             bone_check  = 0;
             group_check = 0;
             for d = 1:length(temp)
-                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
-                group_c = isequal(lower(data_1),lower(string(temp(d))));
+                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d)))); %does this match Bone_data
+                group_c = isequal(lower(data_1),lower(string(temp(d)))); %does this match current group name (data1)
                 if isequal(bone_c,1)
-                    bone_check = 1;
+                    bone_check = 1; %flags the file 
                 end
                 if isequal(group_c,1)
-                    group_check = 1;
+                    group_check = 1; %flags the file that matches
                 end
                 if bone_check == 1 && group_check == 1
                     % sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name)

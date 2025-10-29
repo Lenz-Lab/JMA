@@ -317,20 +317,19 @@ for subj_count = 1:length(g)
 
                 CP = Data.(subjects{subj_count}).(bone_names{bone_count}).CP;
 
-                q = CP';
                 p = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).Points;
 
                 % Will need to flip the bone if it is a left in order to align
                 % properly.
                 if isfield(Data.(subjects{subj_count}),'Side') == 1
                     if isequal(Data.(subjects{subj_count}).Side,'Left')
-                        p = [-1*p(:,1) p(:,2) p(:,3)]';
+                        p = [-1*p(:,1) p(:,2) p(:,3)];
                     end
                     if isequal(Data.(subjects{subj_count}).Side,'Right')
-                        p = [p(:,1) p(:,2) p(:,3)]';
+                        p = [p(:,1) p(:,2) p(:,3)];
                     end   
                 elseif isfield(Data.(subjects{subj_count}),'Side') == 0
-                        p = [p(:,1) p(:,2) p(:,3)]';
+                        p = [p(:,1) p(:,2) p(:,3)];
                 end
 
                 %% Error ICP
@@ -338,38 +337,11 @@ for subj_count = 1:length(g)
                 ICP     = cell(12,1);
                 RT      = cell(12,1);
                 Rt      = cell(12,1);
-                parfor (icp_count = 0:11,pool)
-                    if icp_count < 4 % x-axis rotation
-                        Rt{icp_count+1} = [1 0 0;0 cosd(90*icp_count) -sind(90*icp_count);0 sind(90*icp_count) cosd(90*icp_count)];
-                    elseif icp_count >= 4 && icp_count < 8 % y-axis rotation
-                        Rt{icp_count+1} = [cosd(90*(icp_count-4)) 0 sind(90*(icp_count-4)); 0 1 0; -sind(90*(icp_count-4)) 0 cosd(90*(icp_count-4))];
-                    elseif icp_count >= 8 % z-axis rotation
-                        Rt{icp_count+1} = [cosd(90*(icp_count-8)) -sind(90*(icp_count-8)) 0; sind(90*(icp_count-8)) cosd(90*(icp_count-8)) 0; 0 0 1];
-                    end
 
-                    P = Rt{icp_count+1}*p;                 
-    
-                    [R,T,ER] = icp(q,P,1000,'Matching','kDtree');
-                    P = (R*P + repmat(T,1,length(P)))';
-                    % 
-                    % figure()
-                    % plot3(CP(:,1),CP(:,2),CP(:,3),'ob')
-                    % hold on
-                    % plot3(P(:,1),P(:,2),P(:,3),'.k')
-                    % axis equal
-    
-                    ER_temp(icp_count+1)   = min(ER);
-                    ICP{icp_count+1}.P     = P;
-                end
-
-                pool.IdleTimeout = 30;                
-
-                %%
-                ER_temp_s = find((ER_temp == min(ER_temp)) == 1);
-                P = ICP{ER_temp_s(1)}.P;
+                [P] = icp_complete(CP,p,200);
                 ICP_group{subj_count}.P     = P;
                 ICP_group{subj_count}.CP    = CP;
-                clear ER_temp ICP
+           
             elseif ~alignment_check
                 P                           = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).Points;
                 ICP_group{subj_count}.P     = P;
@@ -596,63 +568,113 @@ for group_count = 1:length(groups)
             end
 
             %% Surface Normals
-            % Using surface normals identify if the faces are within
-            % coverage
-            bone_center1 = incenter(bone_STL1);
-            bone_normal1 = faceNormal(bone_STL1);
-    
-            bone_center2 = incenter(bone_STL2);
+            % Using surface normals identify if the faces are within coverage
+            bone_center1 = incenter(bone_STL1);       %returns the center point of each triangulated mesh
+            bone_normal1 = faceNormal(bone_STL1);     %returns the unit normal vector
+            bone_center2 = incenter(bone_STL2);       %a 3x3 array of x,y,z coordinates for each face center
             
-            %  This if/ifelse statement restricts the ROI to reduce
-            %  computational time
+            %Parameters for robust/fallback
+            roi_expand_factor = 1.25;   % scale factor for region expansion
+            min_padding = 2.0;          % ensure ROI never collapses below 2 mm
+            max_padding = 500.0;         % prevent huge ROI
+            serial_fallback = true;     % use regular for-loop if parfor fails
+
+
+            %  This if/ifelse statement restricts the ROI to reduces computational time
             %  Specifically it looks at the bone with the CP
-            if isequal(frame_count,frame_start)
-                i_ROI = 1:size(bone_center1,1);
-            elseif frame_count > frame_start
-                i_ROI = bone_center1_identified;
-                tol = 1.25*max(max(abs(bone_STL1.Points) - abs(Bone_STL1.Points)));
-                x = [max(bone_center1(i_ROI,1)) min(bone_center1(i_ROI,1))];
-                y = [max(bone_center1(i_ROI,2)) min(bone_center1(i_ROI,2))];
-                z = [max(bone_center1(i_ROI,3)) min(bone_center1(i_ROI,3))];     
-                i_ROI = find(bone_center1(:,1) <= x(1)+tol & bone_center1(:,1) >= x(2)-tol...
-                               & bone_center1(:,2) <= y(1)+tol & bone_center1(:,2) >= y(2)-tol...
-                               & bone_center1(:,3) <= z(1)+tol & bone_center1(:,3) >= z(2)-tol);            
-            end
+           if isequal(frame_count,frame_start) || ~exist('bone_center1_identified','var') || isempty(bone_center1_identified)
+                i_ROI = (1:size(bone_center1,1))'; 
+                prev_bbox = [min(bone_center1(:,1:3),[],1); max(bone_center1(:,1:3),[],1)]; %saves the previous bounding box
+                %the first frame includes all the triangles (entire bone)
+                %because we don't know yet which area the bone interacts 
+
+            else
+                %if bounding box is empty use the previous bounding box
+                if ~exist('prev_bbox','var') || isempty(prev_bbox)
+                    prev_pts = bone_center1(bone_center1_identified,:);
+                    prev_bbox = [min(prev_pts,[],1); max(prev_pts,[],1)];
+                end
+               
+                bbox_size = prev_bbox(2,:) - prev_bbox(1,:); %find how large the last ROI was
+                pad_by = max(min_padding, roi_expand_factor * bbox_size - bbox_size); %expand it by a constant scale
+                pad_by = min(pad_by, max_padding); %make sure to expand by at least min padding and not more than max padding
+
+                %construct new expanding boundary boxes
+                bbox_min = prev_bbox(1,:) - pad_by;
+                bbox_max = prev_bbox(2,:) + pad_by;
+                %select the triangle centers from within the bounding box
+                i_ROI = find( bone_center1(:,1) >= bbox_min(1) & bone_center1(:,1) <= bbox_max(1) & ...
+                      bone_center1(:,2) >= bbox_min(2) & bone_center1(:,2) <= bbox_max(2) & ...
+                      bone_center1(:,3) >= bbox_min(3) & bone_center1(:,3) <= bbox_max(3) );
+
+                %add a failsafe (if it fails, go back to the previous ROI
+                if isempty(i_ROI)
+                    if exist('bone_center1_identified','var') && ~isempty(bone_center1_identified)
+                        i_ROI = bone_center1_identified;
+                    else
+                        i_ROI = (1:size(bone_center1,1))';
+                    end
+                end
+
+                %update the bounding box for the next frame
+                curr_pts = bone_center1(i_ROI,:);
+                prev_bbox = [min(curr_pts,[],1); max(curr_pts,[],1)];
+           end
+
+%             elseif frame_count > frame_start 
+%                 i_ROI = bone_center1_identified; %want to test the previously identified ROI
+%                 %tol = 1.25*max(max(abs(bone_STL1.Points) - abs(Bone_STL1.Points)));
+%                 %above is incorrect because if tolerance is + or - it will
+%                 %shrink the ROI accordingly which we don't want 
+%                 tol = x;
+%                 %x,y,z will define the box that the ROI is in
+%                 x = [max(bone_center1(i_ROI,1)) min(bone_center1(i_ROI,1))];
+%                 y = [max(bone_center1(i_ROI,2)) min(bone_center1(i_ROI,2))];
+%                 z = [max(bone_center1(i_ROI,3)) min(bone_center1(i_ROI,3))];     
+%                 i_ROI = find(bone_center1(:,1) <= x(1)+tol & bone_center1(:,1) >= x(2)-tol...
+%                                & bone_center1(:,2) <= y(1)+tol & bone_center1(:,2) >= y(2)-tol...
+%                                & bone_center1(:,3) <= z(1)+tol & bone_center1(:,3) >= z(2)-tol);            
+
             % This narrows the ROI on the bone without the CP
             % ROI_threshold1 = 10;
-            x = [max(bone_center1(i_ROI,1)) min(bone_center1(i_ROI,1))];
+            x = [max(bone_center1(i_ROI,1)) min(bone_center1(i_ROI,1))]; %recompute the bounding box using the new ROI
             y = [max(bone_center1(i_ROI,2)) min(bone_center1(i_ROI,2))];
             z = [max(bone_center1(i_ROI,3)) min(bone_center1(i_ROI,3))];     
+            %find the part of the bone that lies within the same spatial
+            %box as bone 1's ROI ("candidate faces")
             iso_check = find(bone_center2(:,1) <= x(1)+ROI_threshold1 & bone_center2(:,1) >= x(2)-ROI_threshold1...
                            & bone_center2(:,2) <= y(1)+ROI_threshold1 & bone_center2(:,2) >= y(2)-ROI_threshold1...
                            & bone_center2(:,3) <= z(1)+ROI_threshold1 & bone_center2(:,3) >= z(2)-ROI_threshold1);
     
+            %these are the surfaces that rays from bone 1 might hit
             a1  = bone_STL2.Points(bone_STL2.ConnectivityList(iso_check,1),:);
             a2  = bone_STL2.Points(bone_STL2.ConnectivityList(iso_check,2),:);
             a3  = bone_STL2.Points(bone_STL2.ConnectivityList(iso_check,3),:);
             
             % Parallel loop for ray intersections
-            % tic
             temp_N = zeros(size(bone_center1(i_ROI,:),1),1);
-            parfor (norm_check = 1:size(bone_center1(i_ROI,:),1),pool)
-            % for norm_check = 1:size(bone_center1(i_ROI,:))
-                [temp_int, ~, ~, ~, ~] = TriangleRayIntersection(bone_center1(i_ROI(norm_check),:),bone_normal1(i_ROI(norm_check),:),a1,a2,a3,'planetype','one sided');
-                temp_INT = find(temp_int == true);
-                if ~isempty(temp_INT)      
+
+            parfor (norm_check = 1:size(bone_center1(i_ROI,:),1), pool)
+                [temp_int, ~, ~, ~, ~] = TriangleRayIntersection( ...
+                    bone_center1(i_ROI(norm_check),:), ...
+                    bone_normal1(i_ROI(norm_check),:), ...
+                    a1, a2, a3, 'planetype', 'one sided');
+                
+                if any(temp_int)
                     temp_N(norm_check,:) = 1;
                 end
             end
-            % toc
-    
-            bone_center1_identified = i_ROI(find(temp_N == 1))';
+            
+            bone_center1_identified = i_ROI(temp_N == 1)'; %updates i_ROI for the next frame
 
-            % figure()
-            % plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.')
-            % hold on
-            % plot3(bone_center1(i_ROI,1),bone_center1(i_ROI,2),bone_center1(i_ROI,3),'.')
-            % hold on        
-            % plot3(bone_center1(bone_center1_identified,1),bone_center1(bone_center1_identified,2),bone_center1(bone_center1_identified,3),'*r')
-            % axis equal             
+%             %Troubleshooting Figure
+%             figure()
+%             plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.k') %full mesh
+%             hold on
+%             plot3(bone_center1(i_ROI,1),bone_center1(i_ROI,2),bone_center1(i_ROI,3),'ob') %current ROI
+%             hold on        
+%             plot3(bone_center1(bone_center1_identified,1),bone_center1(bone_center1_identified,2),bone_center1(bone_center1_identified,3),'*r')
+%             axis equal   %interesecting region          
 
             %% Find the indices of the points and faces
             % tri_found -> faces found that intersect opposing surface
@@ -719,7 +741,7 @@ for group_count = 1:length(groups)
                 TR.faces    =    bone_STL1.ConnectivityList(bone_center1_identified,:);
 
                 TTTT = triangulation(bone_STL1.ConnectivityList(bone_center1_identified,:),bone_STL1.Points);
-                stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%s\\%s',data_dir,subjects{subj_count},bone_names{1},bone_names{2},bone_names{1});
+                stl_save_path = sprintf('%s\\Outputs\\Coverage_Models\\%s\\%s_%sicp\\%s',data_dir,subjects{subj_count},bone_names{1},bone_names{2},bone_names{1});
 
                 MF = dir(fullfile(stl_save_path));
                 if isempty(MF) == 1

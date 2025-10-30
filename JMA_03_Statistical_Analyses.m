@@ -87,15 +87,13 @@ end
 
 if stats_type == 1 || stats_type == 3 || stats_type == 5
     Prompt(end+1,:)             = {'What is the minimum percentage of participants that must be included for Group 1? (%)','Group1',[]};
-    % DefAns.Group1               = '100';
-    DefAns.Group1               = '70';
+    DefAns.Group1               = '100';
     formats(end+1,1).type       = 'edit';
     formats(end,1).size         = [50 20];
 
     if stats_type == 1
         Prompt(end+1,:)         = {'What is the minimum percentage of participants that must be included for Group 2? (%)','Group2',[]};
-        % DefAns.Group2           = '100';
-        DefAns.Group2           = '70';
+        DefAns.Group2           = '100';
         formats(end+1,1).type   = 'edit';
         formats(end,1).size     = [50 20];   
     end
@@ -179,27 +177,26 @@ for bone_count = 1:bone_amount
     Bone_Data{bone_count} = load(fullfile(file_path, file_name));
 end
 
-
 %% Selecting Groups
 fprintf('Selecting Groups...\n')
 subj_group = Bone_Data{1}.subj_group;
 groups = fieldnames(subj_group);
-% t1 = 'Please select groups';
-% 
-% if isequal(stats_type,1)
-%     %%
-%     t2 = 'If two are selected (t-Test or Wilcoxon rank sum)';
-%     t3 = 'If more than two (one-way ANOVA or Kruskal-Wallis)';
-%     ma = 75;
-%     uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2]);sprintf([blanks(floor((ma-length(t3))/2)),t3])}))    
-% elseif isequal(stats_type,2)
-%     %%
-%     t2 = 'Only select two for SPM';
-%     ma = 2*max([length(t1), length(t2)]);
-%     uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2])}))
-% end
+t1 = 'Please select groups';
 
+if isequal(stats_type,1)
+    %%
+    t2 = 'If two are selected (t-Test or Wilcoxon rank sum)';
+    t3 = 'If more than two (one-way ANOVA or Kruskal-Wallis)';
+    ma = 75;
+    uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2]);sprintf([blanks(floor((ma-length(t3))/2)),t3])}))    
+elseif isequal(stats_type,2)
+    %%
+    t2 = 'Only select two for SPM';
+    ma = 2*max([length(t1), length(t2)]);
+    uiwait(msgbox({sprintf([blanks(floor((ma-length(t1))/2)),t1]);sprintf([blanks(floor((ma-length(t2))/2)),t2])}))
+end
 
+%%
 if stats_type <= 2
     g = fieldnames(subj_group);
     [indx,tf] = listdlg('ListString',string(g),'Name','Please select groups','ListSize',[500 500]);
@@ -329,20 +326,20 @@ if stats_type < 4 || stats_type == 5
     for bone_count = 1:bone_amount
         S = dir(fullfile(sprintf('%s\\Mean_Models',data_dir),'*.stl'));     
         for c = 1:length(S)
-            temp = strsplit(S(c).name,'.');
-            temp = strrep(temp(1),' ','_');
-            temp = split(string(temp(1)),'_');
+            temp = strsplit(S(c).name,'.'); %remove the file extension
+            temp = strrep(temp(1),' ','_'); %replace spaces with _
+            temp = split(string(temp(1)),'_'); %split the underscores into pieces
         
             bone_check  = 0;
             group_check = 0;
             for d = 1:length(temp)
-                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d))));
-                group_c = isequal(lower(data_1),lower(string(temp(d))));
+                bone_c  = isequal(lower(string(Bone_Data{bone_count}.bone_names(1))),lower(string(temp(d)))); %does this match Bone_data
+                group_c = isequal(lower(data_1),lower(string(temp(d)))); %does this match current group name (data1)
                 if isequal(bone_c,1)
-                    bone_check = 1;
+                    bone_check = 1; %flags the file 
                 end
                 if isequal(group_c,1)
-                    group_check = 1;
+                    group_check = 1; %flags the file that matches
                 end
                 if bone_check == 1 && group_check == 1
                     % sprintf('%s\\Mean_Models\\%s',data_dir,S(c).name)
@@ -525,7 +522,7 @@ end
 BoneSTL.faces       = MeanShape{1}.ConnectivityList;
 BoneSTL.vertices    = MeanShape{1}.Points;
 
-% uiwait(msgbox('Correspondence particles are representative of results, but data at the particles are randomly generated for the purpose of visualization for selection of figure settings.'))
+uiwait(msgbox('Correspondence particles are representative of results, but data at the particles are randomly generated for the purpose of visualization for selection of figure settings.'))
 while isequal(set_change,1)
     close all
     vis_toggle = 1;
@@ -860,111 +857,31 @@ if isequal(stats_type,1)
                     agrp_id = [];
                     data_all = [];
                     f = 1;
-                    clear statfull sub_ids
-
+                    clear 
                     for group_count = 1:length(groups)
                         temp = [];
-                        grpName = string(groups(group_count));
-                        subjList = string(subj_group.(grpName).SubjectList);
-                        sub_ids.(grpName) = subjList;
-                        vals_full = NaN(1, numel(subjList));
-
-                        for subj_count = 1:length(subjList)
-                            subj_id = char(subjList(subj_count));                         % use char for fieldname
-                            Sg = Bone_Data{bone_count}.DataOut.(g{g_count});              % shorthand
-
-                            % Bounds check in case {n,m} is outside the cell array
-                            if isfield(Sg, subj_id) && n <= size(Sg.(subj_id),1) && m <= size(Sg.(subj_id),2)
-                                v = Sg.(subj_id){n,m};
-                            else
-                                v = NaN;
-                            end
-
-                            % Convert to a single finite numeric value
-                            if isempty(v) || ~isnumeric(v)
-                                v_scalar = NaN;
-                            elseif ~isscalar(v)
-                                % If your data sometimes stores a short vector, compress it to a scalar:
-                                % choose ONE policy: mean / first element. Using mean here:
-                                v_scalar = mean(v(:), 'omitnan');
-                            else
-                                v_scalar = v;
-                            end
-
-                            % Drop non-finite (Inf/-Inf) to NaN so filters work later
-                            if ~isfinite(v_scalar)
-                                v_scalar = NaN;
-                            end
-
-                            % Now these won’t error:
-                            vals_full(subj_count) = v_scalar;    % stays 1xN
-                            temp = [temp v_scalar];              % your original accumulator
-
+                        for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)
+                            temp = [temp Bone_Data{bone_count}.DataOut.(g{g_count}).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
                         end
-
                         temp(find(isnan(temp))) = [];
-                        statdata.(grpName) = temp;
-                        statfull.(grpName) = vals_full;
-
+                        statdata.(string(groups(group_count))) = temp;
                         for nn = 1:length(temp)
                             agrp_id(f) = group_count;
                             f = f + 1;
                         end
                         data_all = [data_all temp];
-                    end
-
-                    if paired_data && length(groups) == 2
-                        grp1 = data_1;
-                        grp2 = data_2;
-
-                        v1 = statfull.(grp1);           % full vectors aligned to SubjectList order (may contain NaNs)
-                        v2 = statfull.(grp2);
-
-                        % Pair by index assuming SubjectList order corresponds across groups
-                        N1 = numel(v1);
-                        N2 = numel(v2);
-                        N  = min(N1, N2);
-                        a1 = v1(1:N);
-                        a2 = v2(1:N);
-
-                        % Keep only true pairs (both finite)
-                        mask = isfinite(a1) & isfinite(a2);
-                        a1 = a1(mask);
-                        a2 = a2(mask);
-
-                        % Require at least perc_part% of each group's subject count as PAIRS
-                        req_pairs = min( ...
-                            floor(N1 * perc_part(1)/100), ...
-                            floor(N2 * perc_part(2)/100) );
-
-                        pair_N = numel(a1);
-                        if pair_N < req_pairs
-                            continue  % not enough valid pairs at this particle/frame
-                        end
-
-                        % Overwrite with paired-aligned data (same length & subjects by position)
-                        statdata.(grp1) = a1;
-                        statdata.(grp2) = a2;
-
-                        % Rebuild pooled arrays for tests/normality
-                        data_all = [a1, a2];
-                        agrp_id  = [ones(1,pair_N), 2*ones(1,pair_N)];
-                    end
-
+                    end         
+                  
                     if isempty(data_all) == 0 && isempty(statdata.(data_1)) == 0 && isempty(statdata.(data_2)) == 0
                         if length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5 % the normality test will not run on arrays smaller than 5
-                            norm_test = normalitytest(data_all);
+                            norm_test = normalitytest(data_all);        
                         else
                             norm_test(8,3) = 0;
-                        end
-
-                        if length(groups) == 2 && ( ...
-                                ( ~paired_data && ...
-                                  length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && ...
-                                  length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100) ) ...
-                              || ( paired_data && pair_N >= req_pairs ) )
-
-                            % Student's t-Test or Wilcoxon Rank Sum
+                        end  
+        
+                        if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
+                                && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
+                            %% Student's t-Test or Wilcoxon Rank Sum
                             if stats1_type == 1
                                 if n == 1 && m == 1
                                     fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
@@ -987,11 +904,11 @@ if isequal(stats_type,1)
                                 end
     
                                 if isempty(pd_parametric) == 0 && isempty(pd_nonparametric) == 0
-                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)]; % Shapiro-Wilk
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [pd_parametric, pd_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
                                 end
                             end
 
-                            % Hotelling's T2 Test
+                            %% Hotelling's T2 Test
                             if stats1_type == 3
                                 if n == 1 && m == 1
                                     fprintf('Multivariate Hotelling''s T^2 Test\n')
@@ -1008,12 +925,12 @@ if isequal(stats_type,1)
                                 p_value_hot         = Compute_PValue_Group_Difference(data,alpha_val,pool);
     
                                 if ~isempty(p_value_hot)
-                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value_hot, p_value_hot, norm_test(8,3)];
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_value_hot, p_value_hot, norm_test(8,3)]; % Shapiro-Wilk Normality test
                                 end                                
                                 clear data
                             end
 
-                        elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100) ...
+                        elseif length(groups) > 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
                                 && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1               
                             if isempty(data_all) == 0 && isempty(agrp_id) == 0
                                 if stats1_type == 2
@@ -1039,7 +956,7 @@ if isequal(stats_type,1)
                                         p_nonparametric = c(find(c(:,1) == comparison(2) & c(:,2) == comparison(1)),6);
                                     end
                                 
-                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)];
+                                    NewBoneData{bone_count}.Results.(g{g_count}){n,m} = [p_parametric, p_nonparametric, norm_test(8,3)]; % Shapiro-Wilk Normality test
                                     if norm_test(8,3) == 0
                                         not_normal.(g{g_count}) = 0;
                                     end
@@ -1836,6 +1753,7 @@ if Bone_Data{1}.max_frames == 1
     X = cell(1,1);
     V = cell(1,1);
     for g_count = 1:length(group_names)
+        %%
         g = Bone_Data{1,1}.subj_group.(group_names{g_count}).SubjectList;
         X{g_count} = [];
         for subj_count = 1:length(g)

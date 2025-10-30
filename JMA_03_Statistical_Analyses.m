@@ -857,7 +857,7 @@ if isequal(stats_type,1)
                     agrp_id = [];
                     data_all = [];
                     f = 1;
-                    clear 
+                    clear statfull sub_ids
                     for group_count = 1:length(groups)
                         temp = [];
                         for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)

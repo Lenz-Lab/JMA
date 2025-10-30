@@ -266,7 +266,7 @@ for n = 1:study_num
                 end
             end
             
-            if isempty(E) == 1 && length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1)) > 1
+            if isempty(E) == 1 && length(Data.(pulled_files{m}).(bone_names{b})(:,1)) > 1
                 Data.(pulled_files{m}).Event = [1 1 length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1)) length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1))];
             end
         end

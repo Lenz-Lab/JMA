@@ -150,19 +150,31 @@ if isequal(mult_group_bone,1)
 end
 
 %% Load Data
-uiwait(msgbox('Please select the directory where the data is located'))
-data_dir = string(uigetdir());
+% Open file explorer with custom prompt instead of separate msgbox
+data_dir = string(uigetdir('', 'Please select the directory where the data is located'));
 
-uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
+% uiwait(msgbox({'Please select the .mat file with the normalized data to be processed';'There will be another prompt but will take time to load!'}));
+% Add path
+addpath(fullfile(data_dir, 'Mean_Models'))
 
-addpath(sprintf('%s\\Mean_Models',data_dir))
-
-fprintf('Loading Data...\n')        
+fprintf('Loading Data...\n')
 file_name_bone = cell(bone_amount,1);
 Bone_Data      = cell(bone_amount,1);
-for bone_count = 1:bone_amount 
-    file_name_bone{bone_count} = uigetfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\*.mat',data_dir));
-    Bone_Data{bone_count} = load(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,file_name_bone{bone_count}));
+
+for bone_count = 1:bone_amount
+    % Show message in the file explorer window itself
+    [file_name, file_path] = uigetfile( ...
+        fullfile(data_dir, 'Outputs', 'JMA_02_Outputs', '*.mat'), ...
+        'Please select the .mat file with the normalized data to be processed');
+    
+    % Handle cancel gracefully
+    if isequal(file_name,0)
+        warning('File selection cancelled for bone %d', bone_count);
+        return
+    end
+    
+    file_name_bone{bone_count} = file_name;
+    Bone_Data{bone_count} = load(fullfile(file_path, file_name));
 end
 
 %% Selecting Groups
@@ -845,6 +857,7 @@ if isequal(stats_type,1)
                     agrp_id = [];
                     data_all = [];
                     f = 1;
+                    clear 
                     for group_count = 1:length(groups)
                         temp = [];
                         for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)

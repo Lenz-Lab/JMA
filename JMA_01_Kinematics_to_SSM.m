@@ -319,18 +319,18 @@ for subj_count = 1:length(g)
 
                 p = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).Points;
 
-                % Will need to flip the bone if it is a left in order to align
-                % properly.
-                if isfield(Data.(subjects{subj_count}),'Side') == 1
-                    if isequal(Data.(subjects{subj_count}).Side,'Left')
-                        p = [-1*p(:,1) p(:,2) p(:,3)];
-                    end
-                    if isequal(Data.(subjects{subj_count}).Side,'Right')
-                        p = [p(:,1) p(:,2) p(:,3)];
-                    end   
-                elseif isfield(Data.(subjects{subj_count}),'Side') == 0
-                        p = [p(:,1) p(:,2) p(:,3)];
-                end
+                % % Will need to flip the bone if it is a left in order to align
+                % % properly.
+                % if isfield(Data.(subjects{subj_count}),'Side') == 1
+                %     if isequal(Data.(subjects{subj_count}).Side,'Left')
+                %         p = [-1*p(:,1) p(:,2) p(:,3)];
+                %     end
+                %     if isequal(Data.(subjects{subj_count}).Side,'Right')
+                %         p = [p(:,1) p(:,2) p(:,3)];
+                %     end   
+                % elseif isfield(Data.(subjects{subj_count}),'Side') == 0
+                %         p = [p(:,1) p(:,2) p(:,3)];
+                % end
 
                 %% Error ICP
                 ER_temp = zeros(12,1);

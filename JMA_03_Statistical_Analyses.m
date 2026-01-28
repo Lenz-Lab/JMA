@@ -968,7 +968,7 @@ if isequal(stats_type,1)
             end
         end
     end
-    
+
     %% Report Normality
     g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
     for n = 1:length(inpdata)
@@ -984,10 +984,10 @@ end
 
 %% Statistical Parametric Mapping
 if isequal(stats_type,2)
-%% Data SPM Analysis
-% This section of code separates the data and conducts a Statistical
-% Parametric Mapping analysis resulting in regions of significance at each
-% particle.
+    %% Data SPM Analysis
+    % This section of code separates the data and conducts a Statistical
+    % Parametric Mapping analysis resulting in regions of significance at each
+    % particle.
     fprintf('Statistical Parametric Mapping\n')
     g = fieldnames(Bone_Data{1}.DataOut_SPM);
     gg = fieldnames(Bone_Data{1}.DataOut_SPM.(string(g(1))));
@@ -1000,52 +1000,80 @@ if isequal(stats_type,2)
                 % Separate data
                 data1 = [];
                 data2 = [];
-              
+
                 for m = 1:Bone_Data{bone_count}.max_frames
-                    if isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_1)){n,m},1) && isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_2)){n,m},1) && isempty(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1)){n,m})) == 0
+                    clear statdata
+                    agrp_id = [];
+                    data_all = [];
+                    f = 1;
+                    clear statfull sub_ids
+                    for group_count = 1:length(groups)
+                        temp = [];
+                        for subj_count = 1:length(subj_group.(string(groups(group_count))).SubjectList)
+                            temp = [temp Bone_Data{bone_count}.DataOut.(g{g_count}).(string(subj_group.(string(groups(group_count))).SubjectList(subj_count))){n,m}];
+                        end
+                        temp(find(isnan(temp))) = [];
+                        statdata.(string(groups(group_count))) = temp;
+                        for nn = 1:length(temp)
+                            agrp_id(f) = group_count;
+                            f = f + 1;
+                        end
+                        % data_all = [data_all temp];
+                    end
+
+                    % if isempty(data_all) == 0 && isempty(statdata.(data_1)) == 0 && isempty(statdata.(data_2)) == 0
+                    % if length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5 % the normality test will not run on arrays smaller than 5
+                    %     norm_test = normalitytest(data_all);
+                    % else
+                    %     norm_test(8,3) = 0;
+                    % end
+
+                    if length(groups) == 2 && length(statdata.(data_1)) >= floor(length(subj_group.(data_1).SubjectList)*perc_part(1)/100) && length(statdata.(data_2)) >= floor(length(subj_group.(data_2).SubjectList)*perc_part(2)/100)...
+                            && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
+                        % if isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_1)){n,m},1) && isequal(Bone_Data{bone_count}.SPM_check_list.(string(data_2)){n,m},1) && isempty(cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1)){n,m})) == 0
                         data1(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_1)){n,m});
                         data2(:,m) = cell2mat(Bone_Data{bone_count}.DataOut_SPM.(g{g_count}).(string(data_2)){n,m});
                     end
-                end
-                % 
-                % Find regions of statistical significance for each particle.
-                % Note that the figures are suppressed!
-                k = 1;
-                if isempty(data1) == 0
-                    if length(data1(1,:)) > 1
-        
-                        temp1 = find(data1(1,:) == 0);
-                        temp2 = find(data1(2,:) == 0);
-                        h = 1;
-                        clear chunk1
-                        if  isequal(temp1,temp2) && isempty(temp1) == 0 && isempty(temp2) == 0
-                            ne0 = find(data1(1,:)~=0);                      % Nonzero Elements
-                            ix0 = unique([ne0(1) ne0(diff([0 ne0])>1)]);    % Segment Start Indices
-                            ix1 = ne0([find(diff(ne0)>1) length(ne0)]);     % Segment End Indices
-                            for k1 = 1:length(ix0)
-                                section1{k1}        = data1(:,ix0(k1):ix1(k1));    % (Included the column)
-                                section2{k1}        = data2(:,ix0(k1):ix1(k1));    
-                                pperc_stance{k1}    = Bone_Data{bone_count}.perc_stance(ix0(k1):ix1(k1),:); 
-                            end
-        
-                            reg_sig.(g{g_count}){bone_count}(n,:) = {[]};
-                            ss = 1;
-                            for s = 1:length(section1)
-                                if length(section1{s}(1,:)) > 1
-                                    sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
-                                    if isempty(sig_stance) == 0
-                                        reg_sig.(g{g_count}){bone_count}(n,:) = {[cell2mat(reg_sig.(g{g_count}){bone_count}(n,:)); sig_stance]};
-                                    end
-                                    ss = ss + 1;
+                    %
+                    % Find regions of statistical significance for each particle.
+                    % Note that the figures are suppressed!
+                    k = 1;
+                    if isempty(data1) == 0
+                        if length(data1(1,:)) > 1
+
+                            temp1 = find(data1(1,:) == 0);
+                            temp2 = find(data1(2,:) == 0);
+                            h = 1;
+                            clear chunk1
+                            if  isequal(temp1,temp2) && isempty(temp1) == 0 && isempty(temp2) == 0
+                                ne0 = find(data1(1,:)~=0);                      % Nonzero Elements
+                                ix0 = unique([ne0(1) ne0(diff([0 ne0])>1)]);    % Segment Start Indices
+                                ix1 = ne0([find(diff(ne0)>1) length(ne0)]);     % Segment End Indices
+                                for k1 = 1:length(ix0)
+                                    section1{k1}        = data1(:,ix0(k1):ix1(k1));    % (Included the column)
+                                    section2{k1}        = data2(:,ix0(k1):ix1(k1));
+                                    pperc_stance{k1}    = Bone_Data{bone_count}.perc_stance(ix0(k1):ix1(k1),:);
                                 end
-                            end                   
-                        else
-                            perc_stance = Bone_Data{bone_count}.perc_stance;
-                            sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
-                            if isempty(sig_stance) == 0
-                                reg_sig.(g{g_count}){bone_count}(n,:) = {sig_stance};
-                                clear data1 data2
-                            end                    
+
+                                reg_sig.(g{g_count}){bone_count}(n,:) = {[]};
+                                ss = 1;
+                                for s = 1:length(section1)
+                                    if length(section1{s}(1,:)) > 1
+                                        sig_stance = SPM_Analysis(section1{s},string(data_1),section2{s},string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],pperc_stance{s},['r','g'],alpha_val,0);
+                                        if isempty(sig_stance) == 0
+                                            reg_sig.(g{g_count}){bone_count}(n,:) = {[cell2mat(reg_sig.(g{g_count}){bone_count}(n,:)); sig_stance]};
+                                        end
+                                        ss = ss + 1;
+                                    end
+                                end
+                            else
+                                perc_stance = Bone_Data{bone_count}.perc_stance;
+                                sig_stance = SPM_Analysis(data1,string(data_1),data2,string(data_2),paired_data,g{g_count},[(0) (mean(mean([data1;data2])) + mean(std([data1;data2]))*2)],[data1;data2],perc_stance,['r','g'],alpha_val,0);
+                                if isempty(sig_stance) == 0
+                                    reg_sig.(g{g_count}){bone_count}(n,:) = {sig_stance};
+                                    clear data1 data2
+                                end
+                            end
                         end
                     end
                 end
@@ -1063,7 +1091,7 @@ end
 if isequal(stats_type,1)
     if isequal(normal_flag,0)
         if isequal(test_type,1)
-            test_name = 'RankSum';
+                test_name = 'RankSum';
         elseif isequal(test_type,2)
             test_name = 'KruskalWallis';
         elseif isequal(test_type,3)

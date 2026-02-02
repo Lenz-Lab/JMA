@@ -1,4 +1,4 @@
-function RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color)
+function RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,view_perspective,bone_alph,colormap_choice,circle_color,glyph_size,glyph_trans,vis_toggle,incl_dist,bone_color,bead_color,plot_title)
 % RainbowFish(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,ColorMap_Flip,SPMIndex,perc_stance,part_scatter)
 % This function creates a figure for joint space measurement data. This
 % function will take the input data and bin them into a distribution from
@@ -39,6 +39,25 @@ function RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,Color
 %% 
 bone_amount = length(MeanShape);
 
+persistent BeadBase DiscBase BeadFaces DiscFaces
+if isempty(BeadBase)
+    P = stlread('Bead.stl');
+    PP = P.Points / max(P.Points(:));
+    BeadFaces = P.ConnectivityList;
+    BeadBase  = PP * 0.85;     % scale later by glyph_size
+
+    T = stlread('Disc.stl');
+    TT = T.Points / max(T.Points(:));
+    DiscFaces = T.ConnectivityList;
+    DiscBase  = TT * 1.2;      % scale later by glyph_size
+end
+
+Bead.vertices = BeadBase * glyph_size;   % if BeadBase is triangulation, adjust accordingly
+Bead.faces    = BeadFaces;
+
+Disc.vertices = DiscBase * glyph_size;
+Disc.faces    = DiscFaces;
+
 %% Create Bin Structure
 if ~exist('view_perspective','var')
     view_perspective = [20 45];
@@ -59,7 +78,7 @@ k = 1;
 colormap_choices = 'difference';
 try
     ColorMap2 = colormap(lower(colormap_choice));
-    close
+    % close
     if exist('ColorMap2','var')
         colormap_choices = 'default';
     end
@@ -112,7 +131,7 @@ catch
             end
         end
         ColorMap2 = flipud(J);
-        close
+        % close
     end
     
     if isequal(colormap_choice,'rudifference')
@@ -152,7 +171,7 @@ catch
             end
         end
         ColorMap2 = flipud(J);
-        close
+        % close
     end
     
     
@@ -186,7 +205,7 @@ catch
             end
         end
         ColorMap2 = flipud(J);
-        close
+        % close
     end   
 end
 
@@ -253,7 +272,7 @@ if exist('CLimits','var')
     % Condition 3: if ColorMap_Flip == 1
     % Flips the variable ColorMap2, this is what will change lower values
     % from blue to red and higher values from red to blue.
-    if ColorMap_Flip == 2
+    if ColorMap_Flip == 1
         k = 0;
         temp = zeros(length(ColorMap2(:,1)),3);
         for n = 1:length(ColorMap2(:,1))
@@ -287,17 +306,6 @@ for bone_count = 1:bone_amount
 end
 
 %% Create Figure With Face Forward Particles
-P = stlread('Bead.stl');
-PP.Points = P.Points/max(max(P.Points));
-T = stlread('Disc.stl');
-TT.Points = T.Points/max(max(T.Points));
-
-Bead.faces     = P.ConnectivityList;
-Bead.vertices  = PP.Points*0.85*glyph_size;
-
-Disc.faces      = T.ConnectivityList;
-Disc.vertices   = TT.Points*1.2*glyph_size;  
-
 Bead_All = cell(bone_amount,1);
 Bead_Clr = cell(bone_amount,1);
 Disc_All = cell(bone_amount,1);
@@ -376,7 +384,7 @@ for bone_count = 1:bone_amount
         end
     % end
 end
-close
+% close
 
 if isequal(vis_toggle,0)
     % fig_obj = figure('visible','off');
@@ -385,6 +393,10 @@ elseif isequal(vis_toggle,1)
     % fig_obj = figure();
     figure()
 end
+% if isgraphics(1)
+%     close(1)
+% end
+
 for bone_count = 1:bone_amount
     B.faces        = MeanShape{bone_count}.ConnectivityList;
     B.vertices     = MeanShape{bone_count}.Points;
@@ -418,10 +430,10 @@ set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor
 view(view_perspective)
 if ColorMap_Flip == 1 && isequal(colormap_choices,'default') && ~isequal(colormap_choice,'difference') && ~isequal(colormap_choice,'rudifference')
     ccmp = colormap(colormap_choice);
-    colormap(ccmp)
+    colormap(flipud(ccmp))
 elseif ColorMap_Flip == 2 && isequal(colormap_choices,'default') && ~isequal(colormap_choice,'difference') && ~isequal(colormap_choice,'rudifference')
     ccmp = colormap(colormap_choice);
-    colormap(flipud(ccmp))
+    colormap(ccmp)
 elseif isequal(colormap_choices,'difference') || isequal(colormap_choice,'rudifference') || isequal(colormap_choice,'difference')
     colormap(ColorMap2)
 elseif isequal(colormap_choices,'other')
@@ -429,10 +441,16 @@ elseif isequal(colormap_choices,'other')
 % elseif ColorMap_Flip == 2 && isequal(colormap_choices,'other')
 %     colormap(flipud(ColorMap2))    
 end
-if ~isempty(perc_stance)
-    ttl = title(sprintf('%d %%',perc_stance));
+
+if exist('plot_title','var') && ~isempty(plot_title)
+    ttl = title(plot_title);
+    ttl.FontSize = 32;
+elseif ~isempty(perc_stance)
+    ttl = title(sprintf('%d %%', perc_stance));
     ttl.FontSize = 32;
 end
+
+
 C = colorbar;
 C.FontSize = 32;
 clim([CLimits(1,1),CLimits(1,2)])

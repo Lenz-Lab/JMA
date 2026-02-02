@@ -52,8 +52,7 @@ study_num           = str2double(set_inp.GrpCount);
 troubleshoot_mode   = set_inp.TrblShoot;
 append_name         = set_inp.AppendName;
 
-uiwait(msgbox('Please select the directory where the data is located'))
-data_dir = string(uigetdir());
+data_dir = string(uigetdir(pwd, 'Please select the directory where the data is located'));
 
 addpath(sprintf('%s\\Mean_Models',data_dir))
 addpath(data_dir)
@@ -61,8 +60,11 @@ addpath(data_dir)
 %% Selecting Data
 fldr_name = cell(study_num,1);
 for n = 1:study_num
-    uiwait(msgbox(sprintf('Please select study group: %d (of %d)',n,study_num)))
-    fldr_name{n} = uigetdir(data_dir);
+    fldr_name{n} = uigetdir(data_dir,sprintf('Please select study group: %d (of %d)', n, study_num));
+
+    if fldr_name{n} == 0
+        error('Study group selection cancelled');
+    end
     addpath(fldr_name{n})
 end
 

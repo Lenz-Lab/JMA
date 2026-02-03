@@ -245,10 +245,12 @@ for n = 1:study_num
             stat_dyn = 1; % Dynamic
         end
 
-        if kine_length ~= opp_kine_length
-            error('Kinematic data is not the same length for above subject')
+        if stat_dyn == 1
+            if kine_length ~= opp_kine_length
+                error('Kinematic data is not the same length for above subject')
+            end
         end
-        
+
         %% Load the Gait Events
         groups = fieldnames(subj_group);
         subjects1 = subj_group.(groups{n}).SubjectList;

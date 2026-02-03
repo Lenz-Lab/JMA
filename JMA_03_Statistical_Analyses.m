@@ -131,6 +131,8 @@ end
 
 if stats_type == 1 || stats_type == 3 || stats_type == 5
     perc_part = str2double(set_inp.Group);
+elseif stats_type == 2
+    perc_part = 100;
 end
 
 if stats_type == 4
@@ -237,6 +239,7 @@ if stats_type <= 2
         pair_list = comparison;
     end
 
+
     comp_flip = comparison(1) > comparison(2);
 
     disp(data_1)
@@ -266,6 +269,7 @@ if stats_type <= 2
 elseif stats_type == 3 || stats_type == 5 % Group no stats
     indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
     data_1 = groups(indx);
+    pair_list = indx;
 
 elseif stats_type == 4 % Individual no stats
     indx = listdlg('ListString',groups,'Name','Please select the group','ListSize',[750 50],'SelectionMode','single');
@@ -275,6 +279,7 @@ elseif stats_type == 4 % Individual no stats
     [indx,~] = listdlg('ListString',temp,'Name','Please select participant(s)','ListSize',[500 500]);
 
     data_1 = string(subj_group.(string(groups)).SubjectList(indx));
+    pair_list = indx;
     Bone_Ind = cell(bone_amount,1);
     for bone_count = 1:bone_amount
         for subj_count = 1:length(data_1)
@@ -828,12 +833,17 @@ for pi = 1:size(pair_list,1)
 
     comparison = pair_list(pi,:);
     data_1 = string(groups{comparison(1)});
-    data_2 = string(groups{comparison(2)});
+    if stats_type ~= 3 && stats_type ~= 4
+        data_2 = string(groups{comparison(2)});
 
-    comp_flip = comparison(1) > comparison(2);
+        comp_flip = comparison(1) > comparison(2);
 
-    fprintf('\n=== Pair %d/%d: %s vs %s ===\n', ...
-        pi, size(pair_list,1), data_1, data_2);
+        fprintf('\n=== Pair %d/%d: %s vs %s ===\n', ...
+            pi, size(pair_list,1), data_1, data_2);
+    else
+        fprintf('\n=== Group %d/%d: %s ===\n', ...
+            pi, size(pair_list,1), data_1);
+    end
 
 
     if stats_type == 1
@@ -1147,9 +1157,14 @@ for pi = 1:size(pair_list,1)
     end
 
     if stat_dyn == 0
-        plot_title = sprintf('%s vs %s', ...
-            string(groups(comparison(1))), ...
-            string(groups(comparison(2))));
+        if stats_type ~=3 && stats_type ~= 4
+            plot_title = sprintf('%s vs %s', ...
+                string(groups(comparison(1))), ...
+                string(groups(comparison(2))));
+        else
+            plot_title = sprintf('%s', ...
+                string(groups(comparison(1))));
+        end
     else
         plot_title = [];  % dynamic → use percent stance
     end
@@ -1519,13 +1534,17 @@ for pi = 1:size(pair_list,1)
         end
     end
 
-    %%
+    %% Group Plot
     if stats_type == 3
         subj_group = Bone_Data{bone_count}.subj_group;
         for plot_data = inpdata
             tif_folder = [];
             N_length = [];
             for n = 1:Bone_Data{1}.max_frames
+                temp = fieldnames(MeanShape_byGroup);
+                MeanShape = MeanShape_byGroup.(temp{comparison(1)});
+                MeanCP = MeanCP_byGroup.(temp{comparison(1)});
+
                 %% Create directory to save .tif images
                 tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s\\',data_dir...
                     ,test_name,string(plot_data_name(plot_data)),bone_comparison_name,...
@@ -1620,8 +1639,12 @@ for pi = 1:size(pair_list,1)
         end
     end
 
-    %%
+    %% Individual Plot
     if stats_type == 4
+        temp = fieldnames(MeanShape_byGroup);
+        MeanShape_Ind = MeanShape_byGroup.(temp{comparison(1)});
+        MeanCP_Ind = MeanCP_byGroup.(temp{comparison(1)});
+
         for subj_count = 1:length(data_1)
             clear MeanShape MeanCP NodalIndex NodalData
             for plot_data = inpdata

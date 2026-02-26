@@ -551,5 +551,63 @@ end
 
 writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',bone_names{1},bone_names{2},temp_name)));
 
+
+%% Per-subject mean distance
+fprintf('\nComputing mean distance per subject...\n')
+
+group_names = fieldnames(subj_group);
+
+SubjectName = {};
+GroupName   = {};
+MeanDist    = [];
+SDDist      = [];
+MinDist     = [];
+MaxDist     = [];
+NValues     = [];
+
+for g_count = 1:numel(group_names)
+    gname = group_names{g_count};
+    subj_list = subj_group.(gname).SubjectList;
+
+    for s = 1:numel(subj_list)
+        subj = subj_list{s};
+
+        raw_dist = DataOut.Distance.(subj);  % cell (particles x frames)
+        v = cell2mat(raw_dist(:));
+        v = v(isfinite(v));
+
+        SubjectName{end+1,1} = subj;
+        GroupName{end+1,1}   = gname;
+
+        if ~isempty(v)
+            MeanDist(end+1,1) = mean(v);
+            SDDist(end+1,1)   = std(v);
+            MinDist(end+1,1)  = min(v);
+            MaxDist(end+1,1)  = max(v);
+            NValues(end+1,1)  = numel(v);
+        else
+            MeanDist(end+1,1) = NaN;
+            SDDist(end+1,1)   = NaN;
+            MinDist(end+1,1)  = NaN;
+            MaxDist(end+1,1)  = NaN;
+            NValues(end+1,1)  = 0;
+        end
+    end
+end
+
+T_dist = table(SubjectName, GroupName, MeanDist, SDDist, MinDist, MaxDist, NValues, ...
+    'VariableNames', {'Subject','Group','Mean_Distance_mm','SD_Distance_mm','Min_Distance_mm','Max_Distance_mm','N_Values'});
+
+% Save to Excel
+out_dir = fullfile(data_dir,'Outputs','JMA_02_Outputs');
+if ~exist(out_dir,'dir'); mkdir(out_dir); end
+
+excel_out = fullfile(out_dir, sprintf('MeanDistance_PerPatient_%s_%s%s.xlsx', ...
+    bone_names{1}, bone_names{2}, temp_name));
+writetable(T_dist, excel_out);
+fprintf('Saved: %s\n', excel_out);
+A.MeanDistance_PerPatient = T_dist;
+
+%% Save
 save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Normalized_Data_%s_%s%s.mat',bone_names{1},bone_names{2},temp_name)),'-struct','A');
 fprintf('Complete!\n')

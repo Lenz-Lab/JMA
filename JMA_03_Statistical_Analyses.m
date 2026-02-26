@@ -1347,7 +1347,7 @@ for pi = 1:size(pair_list,1)
                         % Create a preview replotter that re-draws THIS exact figure using current FigSet
                         previewPlotFcn = @(S) localReplotCurrentFigure( ...
                             S, MeanShape, MeanCP, NodalIndex, NodalData, CLimits, ...
-                            SPM_index, floor(Bone_Data{1}.perc_stance(n)), vis_toggle);
+                            SPM_index, floor(Bone_Data{1}.perc_stance(n)), vis_toggle, plot_title);
 
                         % Loop until user is happy, then optional save
                         [FigSet, did_save] = configureFigureSettings( ...
@@ -1891,7 +1891,7 @@ end
 
 %% Helper Function
 function ax = localReplotCurrentFigure(S, MeanShape, MeanCP, NodalIndex, NodalData, ...
-    CLimits, SPM_index, perc_stance, vis_toggle)
+    CLimits, SPM_index, perc_stance, vis_toggle, plot_title)
 
 % Close current fig so the preview always redraws cleanly (optional)
 close(gcf);
@@ -1900,7 +1900,7 @@ RainbowFish_Stitch2(MeanShape, MeanCP, NodalIndex, NodalData, CLimits, ...
     S.ColorMap_Flip, SPM_index, perc_stance, ...
     S.view_perspective, S.bone_alph, S.colormap_choice, ...
     S.circle_color, S.glyph_size, S.glyph_trans, ...
-    vis_toggle, S.incl_dist, S.bone_color, S.bead_color);
+    vis_toggle, S.incl_dist, S.bone_color, S.bead_color, plot_title);
 
 ax = gca;
 end

@@ -9,7 +9,7 @@
 
 % Modified By: Andrew Peterson
 % Version: 
-% Date: 10/30/2025
+% Date: 1/28/2026
 % Notes: 
 
 %% Required Files and Input
@@ -122,8 +122,8 @@ troubleshoot_mode       = set_inp.TrblShoot;
 ROI_threshold1          = str2double(set_inp.ROIthresh);
 alignment_check         = set_inp.AlignCk;
 
-uiwait(msgbox('Please select the directory where the data is located'))
-data_dir = string(uigetdir());
+data_dir = string(uigetdir(pwd, ...
+    'Please select the directory where the data is located'));
 
 %% Clean Slate
 addpath(sprintf('%s\\Scripts',pwd))
@@ -132,8 +132,11 @@ addpath(sprintf('%s\\Mean_Models',data_dir))
 %% Selecting Data
 fldr_name = cell(study_num,1);
 for n = 1:study_num
-    uiwait(msgbox(sprintf('Please select study group: %d (of %d)',n,study_num)))
-    fldr_name{n} = uigetdir(data_dir);
+    fldr_name{n} = uigetdir(data_dir,sprintf('Please select study group: %d (of %d)', n, study_num));
+
+    if fldr_name{n} == 0
+        error('Study group selection cancelled');
+    end
     addpath(fldr_name{n})
 end
 
@@ -211,19 +214,24 @@ for n = 1:study_num
         %% Load the Individual Bone Kinematics from .txt
         K = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.txt'));
         if isempty(K) == 0
-            for b = 1:length(bone_names)     
+            for b = 1:length(bone_names)
                 for c = 1:length(K)
                     temp = strsplit(K(c).name,'.');
-                    temp = strrep(temp(1),' ','_');                    
+                    temp = strrep(temp(1),' ','_');
                     temp = split(temp,'_');
                     for d = 1:length(temp)
                         temp_check = strfind(lower(bone_names{b}),lower(temp{d}));
                         if  temp_check == 1
                             temp_txt = load(K(c).name);
                             Data.(pulled_files{m}).(bone_names{b}).Kinematics   = temp_txt;
+                            if b == 1
+                                kine_length = length(temp_txt);
+                            else
+                                opp_kine_length = length(temp_txt);
+                            end
                         end
                     end
-                end  
+                end
             end
         end
         
@@ -231,9 +239,18 @@ for n = 1:study_num
             for b = 1:length(bone_names)
                 % Assumes there is no kinematics and it is one static frame
                 Data.(pulled_files{m}).(bone_names{b}).Kinematics = [1 0 0 0, 0 1 0 0, 0 0 1 0, 0 0 0 1]; % Identity Matrix
+                stat_dyn = 0; % Static
+            end
+        else
+            stat_dyn = 1; % Dynamic
+        end
+
+        if stat_dyn == 1
+            if kine_length ~= opp_kine_length
+                error('Kinematic data is not the same length for above subject')
             end
         end
-        
+
         %% Load the Gait Events
         groups = fieldnames(subj_group);
         subjects1 = subj_group.(groups{n}).SubjectList;
@@ -289,6 +306,9 @@ for n = 1:study_num
     end
     clear pulled_files
 end
+
+% Kinematic Length Check
+
 
 subjects = subjects(~cellfun('isempty',subjects));
 
@@ -420,7 +440,7 @@ if troubleshoot_mode == 1
 end
 
 %% Troubleshoot Mode - Kinematics
-if troubleshoot_mode == 1
+if troubleshoot_mode == 1 && stat_dyn == 1
     close all
     frame_count = 1;
     for subj_count = 1:length(subjects)
@@ -480,15 +500,19 @@ for n = 1:length(g)
 end
 waitbar_count = 1;
 
-W = waitbar(waitbar_count/waitbar_length,'Transforming bones from kinematics...');
+W = waitbar(waitbar_count/waitbar_length,'Transforming bones...');
 
 %% Bone Transformations via Kinematics
-fprintf('Bone Transformations via Kinematics:\n')
+if stat_dyn == 1
+    fprintf('Bone Transformations via Kinematics:\n')
+else
+    fprintf('Bone Transformations:/n')
+end
 groups = fieldnames(subj_group);
 
 % waitbar update
 if isgraphics(W) == 1
-    W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones from kinematics...');
+    W = waitbar(waitbar_count/waitbar_length,W,'Transforming bones...');
 end
 
 for group_count = 1:length(groups)
@@ -731,7 +755,7 @@ for group_count = 1:length(groups)
 
             Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1} = sum(area_tri);
 
-            %% Save the Coverage .stl?
+            %% Save the Coverage stl
             % Creates .stl to calculate surface area in external software and shows the
             % surface with the 'identified nodes' in blue.
 
@@ -838,7 +862,7 @@ for group_count = 1:length(groups)
     
                 Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,2} = sum(area_tri);
 
-                %% Save the Coverage .stl?
+                %% Save the Coverage stl
                 % Creates .stl to calculate surface area in external software and shows the
                 % surface with the 'identified nodes' in blue.
     
@@ -1020,7 +1044,6 @@ for group_count = 1:length(groups)
                 mkdir(sprintf('%s\\Outputs\\',data_dir));
                 mkdir(sprintf('%s\\Outputs\\JMA_01_Outputs\\',data_dir));
             end
-
 
             if rem(frame_count,save_interval) == 0
                 fprintf('     saving .mat file backup...\n')

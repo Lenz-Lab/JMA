@@ -1641,19 +1641,20 @@ for pi = 1:size(pair_list,1)
 
     %% Individual Plot
     if stats_type == 4
-        temp = fieldnames(MeanShape_byGroup);
-        MeanShape_Ind = MeanShape_byGroup.(temp{comparison(1)});
-        MeanCP_Ind = MeanCP_byGroup.(temp{comparison(1)});
+        % temp = fieldnames(MeanShape_byGroup);
+        % MeanShape_Ind = MeanShape_byGroup.(temp{comparison(1)});
+        % MeanCP_Ind = MeanCP_byGroup.(temp{comparison(1)});
 
         for subj_count = 1:length(data_1)
             clear MeanShape MeanCP NodalIndex NodalData
             for plot_data = inpdata
                 tif_folder = [];
                 N_length = [];
+                individual = (string(subj_group.(string(data_1(subj_count))).SubjectList(subj_count)));
                 if norm_raw == 1
                     frame_count_ind = Bone_Data{1}.max_frames;
-                elseif norm_raw ==2
-                    frame_count_ind = length(fieldnames(Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData));
+                elseif norm_raw == 2
+                    frame_count_ind = length(fieldnames(Bone_Ind{bone_count}.(string(individual)).Data.(string(individual)).MeasureData));
                 end
                 for n = 1:frame_count_ind
                     %% Create directory to save .tif images
@@ -1676,8 +1677,12 @@ for pi = 1:size(pair_list,1)
                     for bone_count = 1:bone_amount
                         temp = [];
                         temp_display = [];
-                        MeanShape{bone_count}   = MeanShape_Ind.(string(data_1(subj_count))){bone_count};
-                        MeanCP{bone_count}      = MeanCP_Ind.(string(data_1(subj_count))){bone_count};
+                        
+                        % MeanShape{bone_count}   = MeanShape_Ind.(string(data_1(subj_count))){bone_count};
+                        % MeanCP{bone_count}      = MeanCP_Ind.(string(data_1(subj_count))){bone_count};
+
+                        MeanShape{bone_count}   = MeanShape_Ind.(string(individual)){bone_count};
+                        MeanCP{bone_count}      = MeanCP_Ind.(string(individual)){bone_count};
 
                         k = 1;
                         % perc_stance = Bone_Data{1,1}.perc_stance;
@@ -1689,10 +1694,11 @@ for pi = 1:size(pair_list,1)
                         NodalData{bone_count}   = {};
                         SPM_index{bone_count}   = [];
                         if norm_raw == 1
-                            for m = 1:length(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count)))(:,1))
-                                if isempty(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count))){m,n}) == 0
-                                    if Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count))){m,n} <= Distance_Upper && Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count))){m,n} >= Distance_Lower
-                                        temp(k,:) = [m Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count))){m,n}];
+                            % for m = 1:length(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(data_1(subj_count)))(:,1))
+                            for m = 1:length(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(individual))(:,1))
+                                if isempty(Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(individual)){m,n}) == 0
+                                    if Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(individual)){m,n} <= Distance_Upper && Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(individual)){m,n} >= Distance_Lower
+                                        temp(k,:) = [m Bone_Data{bone_count}.DataOut.(string(plot_data_name(plot_data))).(string(individual)){m,n}];
                                         k = k + 1;
                                     end
                                 end
@@ -1703,14 +1709,15 @@ for pi = 1:size(pair_list,1)
                             end
 
                         elseif norm_raw == 2
-                            NodalData{bone_count}   = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Data.(plot_data_name{plot_data});
-                            NodalIndex{bone_count}  = Bone_Ind{bone_count}.(data_1{subj_count}).Data.(data_1{subj_count}).MeasureData.(sprintf('F_%d',n)).Pair(:,1);
+                            NodalData{bone_count}   = Bone_Ind{bone_count}.(string(individual)).Data.(string(individual)).MeasureData.(sprintf('F_%d',n)).Data.(plot_data_name{plot_data});
+                            NodalIndex{bone_count}  = Bone_Ind{bone_count}.(string(individual)).Data.(string(individual)).MeasureData.(sprintf('F_%d',n)).Pair(:,1);
                         end
                     end
 
                     %% Create figure and save as .tif
                     CLimits = [L U];
                     vis_toggle = 1;
+                    FigSet.view_perspective = [0 -90];
                     if isempty(NodalData{1}) == 0
                         fprintf('%s\n',string(n))
                         figure()

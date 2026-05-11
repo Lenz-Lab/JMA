@@ -972,17 +972,45 @@ for pi = 1:size(pair_list,1)
             end
         end
 
-        %% Report Normality
+        %% Report Normality & Export Statistics
         g = fieldnames(Bone_Data{bone_count}.DataOut_Mean);
+        p_data = NewBoneData{bone_count}.Results.(g{inpdata(inpdata)});
+        w = 1;
+
         for n = 1:length(inpdata)
             if not_normal.(string(g(inpdata(n)))) == 0
                 fprintf('Normality Test %s: Nonparametric\n',string(g(inpdata(n))))
                 normal_flag = 0;
+                for r = 1:length(p_data)
+                    if ~isempty(p_data{r,:}) && p_data{r,:}(:,2) < alpha_val
+                        for g_length = 1:length(groups)
+                            group_data(g_length,1) = Bone_Data{1, 1}.DataOut_Mean.(g{inpdata(n)}).(string(groups(g_length)))(r,1)';
+                        end
+                        stat_export(w,:) = [r, p_data{r,:}(:,2), group_data];
+                        w = w + 1;
+                    end
+                end
             elseif not_normal.(string(g(inpdata(n)))) == 1
                 fprintf('Normality Test %s: Parametric\n',string(g(inpdata(n))))
                 normal_flag = 1;
+                for r = 1:length(p_data)
+                    if ~isempty(p_data{r,:}) && p_data{r,:}(:,1) < alpha_val
+                        for g_length = 1:length(groups)
+                            group_data(g_length,1) = Bone_Data{1, 1}.DataOut_Mean.(g{inpdata(n)}).(string(groups(g_length)))(r,1);
+                        end
+                        stat_export(w,:) = [r, p_data{r,:}(:,1), group_data'];
+                        w = w + 1;
+                    end
+                end
             end
         end
+
+        group_headers = string(groups)';
+
+        varNames = ["CP_index", "p_value", group_headers];
+
+        T_statex = array2table(stat_export, ...
+            'VariableNames', matlab.lang.makeValidName(varNames));
     end
 
     %% Statistical Parametric Mapping
@@ -1504,6 +1532,8 @@ for pi = 1:size(pair_list,1)
             writematrix(cohen_hedge, ...
                 sprintf('%s\\Results\\%s_EffectSize_%s_FullJoint.xlsx', data_dir, measureName, bone_comparison_name), ...
                 'Range', sprintf('B%d', nG+3));
+
+             writetable(T_statex,sprintf('%s\\Results\\%s_StatExports_%s.xlsx',data_dir, measureName, bone_comparison_name));
 
             %%
             if ~isempty(BoneRegion{1})

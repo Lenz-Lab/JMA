@@ -17,8 +17,8 @@ function RainbowFish_Stitch2(MeanShape,MeanCP,NodalIndex,NodalData,CLimits,Color
 %   L = lower limit
 %   U = upper limt
 % ColorMap_Flip - changes the colormap
-% ColorMap_Flip = 1 from blue to red, with blue being lowest values
-% ColorMap_Flip = 2 from red to blue, with red being lowest values
+% ColorMap_Flip = 1 reverses the colormap (jet: red = lowest values)
+% ColorMap_Flip = 2 standard colormap order (jet: blue = lowest values)
 % SPMIndex      = indices of which particles are statistically significant
 % perc_stance   = current percentage of stance (shown on figure)
 %   (requires Bead.stl and Disc.stl to work)

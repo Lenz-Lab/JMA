@@ -1,3 +1,14 @@
+%% Joint Measurement Analysis #0 - DSX Pre-Processing (optional)
+% Converts DSX kinematics exports into the plain transform files JMA_01
+% reads. For every .txt (and extensionless "transforms") file under the
+% selected folder that still has a header row, it drops the header and the
+% FRAME and TIME columns, checks that 16 values (one 4x4 transform) remain
+% per row, and saves the result as comma-separated values.
+%
+% WARNING: files are overwritten in place. Keep a copy of the raw exports.
+% Files whose first line is already numeric are skipped, so running it
+% twice is safe.
+
 clear;clc;
 
 %% Select parent directory
@@ -9,15 +20,16 @@ if isequal(parent_dir,0)
     return
 end
 
-%% Find all txt files in selected folder (non-recursive)
-% file_list = dir(fullfile(parent_dir, '*transforms'));
-
-%If you want to include subfolders too, replace above with:
+%% Find all txt files in the selected folder and its subfolders
 file_list = [ ...
     dir(fullfile(parent_dir, '**', '*.txt')); ...
     dir(fullfile(parent_dir, '**', '*.TXT')); ...
     dir(fullfile(parent_dir, '**', 'transforms'))
 ];
+% Files only, each once (*.txt and *.TXT match the same files on Windows)
+file_list = file_list(~[file_list.isdir]);
+[~, keep] = unique(lower(fullfile({file_list.folder}, {file_list.name})));
+file_list = file_list(sort(keep));
 
 if isempty(file_list)
     msgbox('⚠️ No .txt files found in the selected directory','No Files','warn');

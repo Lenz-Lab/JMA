@@ -1,7 +1,22 @@
 %% Joint Measurement Analysis #1 - Kinematics to SSM
-% Calculates joint space distance and congruence index between two 
+% Calculates joint space distance and congruence index between two
 % different bones at correspondence particles on a particular bone surface
 % throughout a dynamic activity.
+%
+% For each subject and frame: move both bones with the kinematics, find
+% the faces of bone 1 whose normals hit bone 2 (the contact region), pair
+% each contact vertex that has a correspondence particle with its nearest
+% vertex on bone 2, and record the distance and congruence index there.
+%
+% Outputs:
+%   <Group>\<Subject>\Data_<Bone1>_<Bone2>_<Subject>.mat   (one per subject;
+%       also used to resume an interrupted run)
+%   Outputs\JMA_01_Outputs\Data_<Bone1>_<Bone2>.mat         (every subject)
+%   Outputs\Coverage_Models\...                              (optional .stl)
+%
+% Subjects are kept as Data.<Group>_<Subject> while running, so the same
+% subject can be in several groups (one group per condition) without one
+% group's results overwriting another's.
 
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group
@@ -137,64 +152,64 @@ for n = 1:study_num
     if fldr_name{n} == 0
         error('Study group selection cancelled');
     end
-    addpath(fldr_name{n})
 end
 
 % Check if there is a parallel pool already
 pool = gcp('nocreate');
 % If no parpool, create one
 if isempty(pool)
-    % delete(gcp('nocreate'))
     pool = parpool([1 100]);
     clc
 end
 pool.IdleTimeout = 60;
 
 %% Loading Data
+% Each subject is stored as Data.<Group>_<Subject>, so the same subject in
+% several groups (e.g. one group per condition) keeps separate data.
+% Files are loaded by full path so a same-named file in another subject's
+% or group's folder is never picked up instead.
 fprintf('Loading Data:\n')
 
-subjects = cell(1000,1);
-
-subj_count = 1;
+subjects = {}; % <Group>_<Subject> keys, every group
 for n = 1:study_num
-    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
-    
-    m = 1;
-    pulled_files = cell(length(D)-2,1);
-    for k = 3:length(D)
-        pulled_files{m} = D(k).name;
-        m = m + 1;
-    end
-    
+    D = dir(fldr_name{n});
+    D = D([D.isdir] & ~startsWith({D.name},'.'));
+    pulled_files = {D.name}';   % subject folder names
+
     temp = strsplit(fldr_name{n},'\');
-    subj_group.(temp{end}).SubjectList = pulled_files;
-    
+    group_name = matlab.lang.makeValidName(temp{end});
+    subj_group.(group_name).SubjectList = pulled_files;
+    subj_group.(group_name).SubjectKey  = cellfun(@(s) matlab.lang.makeValidName(sprintf('%s_%s',group_name,s)), ...
+        pulled_files, 'UniformOutput', false);
+    subj_group.(group_name).Folder      = fldr_name{n};
+
     %% Load Data for Each Subject
     for m = 1:length(pulled_files)
         pool.IdleTimeout = 60;
-        %%
+        subj_dir = fullfile(fldr_name{n},pulled_files{m});
+        key      = subj_group.(group_name).SubjectKey{m};
         fprintf('   %s\n',pulled_files{m})
-        addpath(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}))
-        
+
         %% Load the Bone.stl Files
-        S = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.stl'));
-        for b = 1:length(bone_names)     
+        % A file belongs to a bone if one of its "_"-separated name parts
+        % is the bone name; a "Right"/"R" or "Left"/"L" part sets the side
+        S = dir(fullfile(subj_dir,'*.stl'));
+        for b = 1:length(bone_names)
             for c = 1:length(S)
                 temp = strsplit(S(c).name,'.');
                 temp = strrep(temp(1),' ','_');
                 temp = split(temp(1),'_');
 
                 for d = 1:length(temp)
-                    % temp_check = strfind(lower(bone_names{b}),lower(temp{d}));
                     temp_check = isequal(lower(bone_names{b}),lower(temp{d}));
                     if  temp_check == 1
-                        Data.(pulled_files{m}).(bone_names{b}).(bone_names{b}) = stlread(S(c).name);
-                        
-                        temp_bone = Data.(pulled_files{m}).(bone_names{b}).(bone_names{b});
-                        
+                        Data.(key).(bone_names{b}).(bone_names{b}) = stlread(fullfile(S(c).folder,S(c).name));
+
+                        temp_bone = Data.(key).(bone_names{b}).(bone_names{b});
+
                         % Calculate Gaussian and Mean Curvatures
                         % Meyer, M., Desbrun, M., Schröder, P., & Barr, A. H. (2003). Discrete differential-geometry operators for triangulated 2-manifolds. In Visualization and mathematics III (pp. 35-57). Springer Berlin Heidelberg.
-                        [Data.(pulled_files{m}).(bone_names{b}).GaussianCurve, Data.(pulled_files{m}).(bone_names{b}).MeanCurve] = curvatures(temp_bone.Points(:,1),temp_bone.Points(:,2),temp_bone.Points(:,3),temp_bone.ConnectivityList);
+                        [Data.(key).(bone_names{b}).GaussianCurve, Data.(key).(bone_names{b}).MeanCurve] = curvatures(temp_bone.Points(:,1),temp_bone.Points(:,2),temp_bone.Points(:,3),temp_bone.ConnectivityList);
                     end
                     % Set which side the bones are. This is important for
                     % pairing the .stl points with the CP points in later
@@ -202,17 +217,18 @@ for n = 1:study_num
                     % different mesh than the input .stl files.
                     side_check = cell2mat(strsplit(temp{d},'.'));
                     if  isequal('right',lower(side_check)) || isequal('r',lower(side_check))
-                        Data.(pulled_files{m}).Side = 'Right';
+                        Data.(key).Side = 'Right';
                     end
                     if  isequal('left',lower(side_check)) || isequal('l',lower(side_check))
-                        Data.(pulled_files{m}).Side = 'Left';
+                        Data.(key).Side = 'Left';
                     end
                 end
-            end  
+            end
         end
-        
+
         %% Load the Individual Bone Kinematics from .txt
-        K = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.txt'));
+        % One 4x4 transform per line (16 values); see the header for format
+        K = dir(fullfile(subj_dir,'*.txt'));
         if isempty(K) == 0
             for b = 1:length(bone_names)
                 for c = 1:length(K)
@@ -222,8 +238,8 @@ for n = 1:study_num
                     for d = 1:length(temp)
                         temp_check = strfind(lower(bone_names{b}),lower(temp{d}));
                         if  temp_check == 1
-                            temp_txt = load(K(c).name);
-                            Data.(pulled_files{m}).(bone_names{b}).Kinematics   = temp_txt;
+                            temp_txt = load(fullfile(K(c).folder,K(c).name));
+                            Data.(key).(bone_names{b}).Kinematics   = temp_txt;
                             if b == 1
                                 kine_length = length(temp_txt);
                             else
@@ -234,11 +250,11 @@ for n = 1:study_num
                 end
             end
         end
-        
+
         if isempty(K) == 1
             for b = 1:length(bone_names)
                 % Assumes there is no kinematics and it is one static frame
-                Data.(pulled_files{m}).(bone_names{b}).Kinematics = [1 0 0 0, 0 1 0 0, 0 0 1 0, 0 0 0 1]; % Identity Matrix
+                Data.(key).(bone_names{b}).Kinematics = [1 0 0 0, 0 1 0 0, 0 0 1 0, 0 0 0 1]; % Identity Matrix
                 stat_dyn = 0; % Static
             end
         else
@@ -252,65 +268,43 @@ for n = 1:study_num
         end
 
         %% Load the Gait Events
-        groups = fieldnames(subj_group);
-        subjects1 = subj_group.(groups{n}).SubjectList;
-        data_count = 1;
-        % structure is [(first tracked frame) (heelstrike) (toe-off) (last tracked frame)]
-        for k = 1:2
-            if k == 1
-                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.xlsx'));
-                if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.csv'));
-                end
-            elseif k == 2
-                E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.csv'));
-                if isempty(E) == 1
-                    E = dir(fullfile(sprintf('%s\\%s\\%s\\',data_dir,groups{n},subjects1{m}),'*.xlsx'));
-                end        
-            end
-            
-            Data.(pulled_files{m}).Event = [1 1 1 1];
-            if isempty(E) == 1
-                Data.(pulled_files{m}).Event = [1 1 1 1];
-            elseif isempty(E) == 0
-                for e_count = 1:length(E)
-                    clear temp_read
-                    
-                    temp_read = readmatrix(E(e_count).name);
-                    if isequal(size(temp_read),[1 4])
-                        Data.(pulled_files{m}).Event = temp_read;
-                    end
-                end
-            end
-            
-            if isempty(E) == 1 && length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1)) > 1
-                Data.(pulled_files{m}).Event = [1 1 length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1)) length(Data.(pulled_files{m}).(bone_names{b}).Kinematics(:,1))];
+        % A .csv (preferred) or .xlsx holding one row:
+        % [(first tracked frame) (heelstrike) (toe-off) (last tracked frame)]
+        E = dir(fullfile(subj_dir,'*.csv'));
+        if isempty(E) == 1
+            E = dir(fullfile(subj_dir,'*.xlsx'));
+        end
+
+        Data.(key).Event = [1 1 1 1];
+        for e_count = 1:length(E)
+            temp_read = readmatrix(fullfile(E(e_count).folder,E(e_count).name));
+            if isequal(size(temp_read),[1 4])
+                Data.(key).Event = temp_read;
             end
         end
 
+        % Without an events file, use the whole trial
+        if isempty(E) == 1 && length(Data.(key).(bone_names{end}).Kinematics(:,1)) > 1
+            Data.(key).Event = [1 1 length(Data.(key).(bone_names{end}).Kinematics(:,1)) length(Data.(key).(bone_names{end}).Kinematics(:,1))];
+        end
+
         %% Load the Correspondence Particles (CP) from ShapeWorks
-        C = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.particles'));    
+        C = dir(fullfile(subj_dir,'*.particles'));
         for c = 1:length(C)
             temp = erase(C(c).name,'.particles');
             temp = split(temp,'_');
             for d = 1:length(temp)
                 temp_check = strfind(lower(bone_names{1}),lower(temp{d}));
                 if  temp_check == 1
-                    temp_cp = importdata(C(c).name);
-                    Data.(pulled_files{m}).(bone_names{1}).CP     = temp_cp;
+                    temp_cp = importdata(fullfile(C(c).folder,C(c).name));
+                    Data.(key).(bone_names{1}).CP     = temp_cp;
                 end
             end
         end
-        subjects{subj_count} = pulled_files{m};
-        subj_count = subj_count + 1;
+        subjects{end+1,1} = key;
     end
     clear pulled_files
 end
-
-% Kinematic Length Check
-
-
-subjects = subjects(~cellfun('isempty',subjects));
 
 %% Identify Indices on Bones from SSM Local Particles
 fprintf('Local Particles -> Bone Indices\n')
@@ -339,25 +333,8 @@ for subj_count = 1:length(g)
 
                 p = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).Points;
 
-                % % Will need to flip the bone if it is a left in order to align
-                % % properly.
-                % if isfield(Data.(subjects{subj_count}),'Side') == 1
-                %     if isequal(Data.(subjects{subj_count}).Side,'Left')
-                %         p = [-1*p(:,1) p(:,2) p(:,3)];
-                %     end
-                %     if isequal(Data.(subjects{subj_count}).Side,'Right')
-                %         p = [p(:,1) p(:,2) p(:,3)];
-                %     end   
-                % elseif isfield(Data.(subjects{subj_count}),'Side') == 0
-                %         p = [p(:,1) p(:,2) p(:,3)];
-                % end
-
                 %% Error ICP
-                ER_temp = zeros(12,1);
-                ICP     = cell(12,1);
-                RT      = cell(12,1);
-                Rt      = cell(12,1);
-
+                % Align the bone's vertices to its particles
                 [P] = icp_complete(CP,p,200);
                 ICP_group{subj_count}.P     = P;
                 ICP_group{subj_count}.CP    = CP;
@@ -372,7 +349,9 @@ for subj_count = 1:length(g)
             %% Identify Nodes and CP
 
             % Find the .stl nodes and their respective correspondence
-            % particles and save to Data structure
+            % particles and save to Data structure. The search box (tol) is
+            % 1.5x the longest edge among a random 10% of the mesh faces.
+            % CP_Bone(r,:) = [particle r, index of its nearest .stl vertex]
             RI = randi([1,size(Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList,1)],1,floor(size(Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList,1)/10));
             list_temp = Data.(subjects{subj_count}).(bone_names{bone_count}).(bone_names{bone_count}).ConnectivityList(RI,:);
             list_distances = zeros(length(list_temp(:,1)),1);
@@ -506,7 +485,7 @@ W = waitbar(waitbar_count/waitbar_length,'Transforming bones...');
 if stat_dyn == 1
     fprintf('Bone Transformations via Kinematics:\n')
 else
-    fprintf('Bone Transformations:/n')
+    fprintf('Bone Transformations:\n')
 end
 groups = fieldnames(subj_group);
 
@@ -516,33 +495,41 @@ if isgraphics(W) == 1
 end
 
 for group_count = 1:length(groups)
-    subjects = subj_group.(groups{group_count}).SubjectList;
-    for subj_count = 1:length(subjects) 
-        fprintf('   %s:\n',subjects{subj_count})
+    subj_names = subj_group.(groups{group_count}).SubjectList;  % folder names
+    subjects   = subj_group.(groups{group_count}).SubjectKey;   % keys in Data
+    for subj_count = 1:length(subjects)
+        subj_name = subj_names{subj_count};
+        subj_dir  = fullfile(subj_group.(groups{group_count}).Folder,subj_name);
+        fprintf('   %s:\n',subj_name)
         frame_start = 1;
         kine_data_length = Data.(subjects{subj_count}).(bone_names{1}).Kinematics;
-        
+
+        % Resume from this subject's saved Data_<Bone1>_<Bone2>_<Subject>.mat
+        % unless overwriting was requested
         clear temp
-        M = dir(fullfile(sprintf('%s\\%s\\%s\\%s',data_dir,groups{group_count},subjects{subj_count}),'*.mat'));
-          
+        M = dir(fullfile(subj_dir,'*.mat'));
         if isempty(M) == 0 && overwrite_data == 0
             for c = 1:length(M)
                 temp_file = strsplit(M(c).name,'.');
                 temp_file = strrep(temp_file(1),' ','_');
                 temp_file = split(temp_file{1},'_');
-                if isequal(lower(temp_file(2)),lower(bone_names{1})) && isequal(lower(temp_file(3)),lower(bone_names{2}))
-                    temp = load(M(c).name);
-                    g = fieldnames(temp.Data);
-                    Data.(string(g)) = temp.Data.(string(g));
+                if length(temp_file) >= 3 && isequal(lower(temp_file(2)),lower(bone_names{1})) && isequal(lower(temp_file(3)),lower(bone_names{2}))
+                    temp = load(fullfile(M(c).folder,M(c).name));
+                    if ~isfield(temp.Data,subj_name)
+                        inner_name = fieldnames(temp.Data);
+                        warning('JMA01:SubjectMismatch', ['%s holds data for subject "%s", not "%s". ' ...
+                            'Not resuming from it; this subject will be recalculated and the file overwritten.'], ...
+                            fullfile(subj_dir,M(c).name), inner_name{1}, subj_name);
+                        clear temp
+                    end
                 end
             end
-            frame_start = 1;
             if exist("temp",'var')
-               frame_start = length(fieldnames(temp.Data.(subjects{subj_count}).MeasureData)) + 1;
-               Data.(subjects{subj_count}) = temp.Data.(subjects{subj_count});
+               frame_start = length(fieldnames(temp.Data.(subj_name).MeasureData)) + 1;
+               Data.(subjects{subj_count}) = temp.Data.(subj_name);
             end
         end
-        clearvars bone_data1 bone_data2 bone_STL1 bone_STL2 Bone_STL1 Bone_STL2 bone_center1_identified alignment_check
+        clearvars bone_data1 bone_data2 bone_STL1 bone_STL2 Bone_STL1 Bone_STL2 bone_center1_identified
 
         %% Pair within each frame
         for frame_count = frame_start:length(kine_data_length(:,1))
@@ -702,34 +689,12 @@ for group_count = 1:length(groups)
 
             %% Find the indices of the points and faces
             % tri_found -> faces found that intersect opposing surface
-            tri_found = zeros(100000,1);
-            k = 1;
-            for tri_check = 1:length(bone_center1_identified)
-                t = bone_STL1.ConnectivityList(bone_center1_identified(tri_check),:);
-                for tri_fill = 1:length(t)
-                    tri_found(k,:) = t(tri_fill);
-                    k = k + 1;
-                end
-            end
-            
-            tri_found = unique(tri_found);
-            tri_found(tri_found(:,1) == 0,:) = [];
-            
-            % tri_point -> index of 'identified nodes'
-            % tri_cp    -> index of correspondex particle
-            tri_cp = zeros(100000,1);
-            tri_points = zeros(100000,1);
-            k = 1;
-            for n = 1:length(tri_found)
-                temp = find(tri_found(n) == Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(:,2));
-                if isempty(temp) == 0
-                    tri_points(k,:)   = Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(temp(1),2);
-                    tri_cp(k,:)       = temp(1); % Data.(subjects{subj_count}).(bone_names{bone_count}).CP_Bone(temp,1); Basically same thing since it is the index...
-                    k = k + 1;
-                end
-            end
-            tri_cp(tri_cp(:,1) == 0,:) = [];
-            tri_points(tri_points(:,1) == 0,:) = [];
+            tri_found = unique(reshape(bone_STL1.ConnectivityList(bone_center1_identified,:)',[],1));
+
+            % tri_points -> 'identified nodes': contact vertices that are
+            % paired with a correspondence particle (CP_Bone(:,2))
+            is_cp_node = ismember(tri_found, Data.(subjects{subj_count}).(bone_names{1}).CP_Bone(:,2));
+            tri_points = tri_found(is_cp_node);
     
             % figure()
             % plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.')
@@ -740,20 +705,7 @@ for group_count = 1:length(groups)
             % axis equal
             
             %% Calculate Coverage Surface Area
-            area_tri = zeros(length(bone_center1_identified),1);
-            for n = 1:length(bone_center1_identified)
-                temp_tri = bone_STL1.ConnectivityList(bone_center1_identified(n),:);
-                P1 = bone_STL1.Points(temp_tri(:,1),:);
-                P2 = bone_STL1.Points(temp_tri(:,2),:);
-                P3 = bone_STL1.Points(temp_tri(:,3),:);
-                a = P2 - P1;
-                b = P3 - P1;
-                c = cross(a,b,2);
-                area_tri(n,:) = 1/2*sum(sqrt(sum(c.^2,2)));
-                clear temp_tri
-            end
-
-            Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1} = sum(area_tri);
+            Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,1} = localFaceArea(bone_STL1,bone_center1_identified);
 
             %% Save the Coverage stl
             % Creates .stl to calculate surface area in external software and shows the
@@ -847,20 +799,7 @@ for group_count = 1:length(groups)
                 % axis equal
                 
                 %% Calculate Coverage Surface Area
-                area_tri = zeros(length(bone_center2_identified),1);
-                for n = 1:length(bone_center2_identified)
-                    temp_tri = bone_STL2.ConnectivityList(bone_center2_identified(n),:);
-                    P1 = bone_STL2.Points(temp_tri(:,1),:);
-                    P2 = bone_STL2.Points(temp_tri(:,2),:);
-                    P3 = bone_STL2.Points(temp_tri(:,3),:);
-                    a = P2 - P1;
-                    b = P3 - P1;
-                    c = cross(a,b,2);
-                    area_tri(n,:) = 1/2*sum(sqrt(sum(c.^2,2)));
-                    clear temp_tri
-                end
-    
-                Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,2} = sum(area_tri);
+                Data.(subjects{subj_count}).CoverageArea.(sprintf('F_%d',frame_count)){:,2} = localFaceArea(bone_STL2,bone_center2_identified);
 
                 %% Save the Coverage stl
                 % Creates .stl to calculate surface area in external software and shows the
@@ -940,67 +879,38 @@ for group_count = 1:length(groups)
             mean2 = Data.(subjects{subj_count}).(bone_names{1}).MeanCurve(i_surf(:,2));
             gaus2 = Data.(subjects{subj_count}).(bone_names{1}).GaussianCurve(i_surf(:,2));
 
+            mean1 = mean1(:); gaus1 = gaus1(:);
+            mean2 = mean2(:); gaus2 = gaus2(:);
+
             %% Principal Curvatures
-            PCMin1 = zeros(length(mean1),1);
-            PCMax1 = zeros(length(mean1),1);
+            PCMin1 = mean1 - sqrt(mean1.^2 - gaus1);
+            PCMax1 = mean1 + sqrt(mean1.^2 - gaus1);
 
-            PCMin2 = zeros(length(mean2),1);
-            PCMax2 = zeros(length(mean2),1);
-
-            for n = 1:length(mean1)
-                PCMin1(n,:) = mean1(n) - sqrt(mean1(n)^2 - gaus1(n));
-                PCMax1(n,:) = mean1(n) + sqrt(mean1(n)^2 - gaus1(n));
-            end
-            
-            for n = 1:length(mean2)
-                PCMin2(n,:) = mean2(n) - sqrt(mean2(n)^2 - gaus2(n));
-                PCMax2(n,:) = mean2(n) + sqrt(mean2(n)^2 - gaus2(n));
-            end  
+            PCMin2 = mean2 - sqrt(mean2.^2 - gaus2);
+            PCMax2 = mean2 + sqrt(mean2.^2 - gaus2);
 
             %% Curvature Differences
-            CD1 = zeros(length(mean1),1);
-            CD2 = zeros(length(mean2),1);
-
-            for n = 1:length(mean1)
-                CD1(n,:) = PCMin1(n,:) - PCMax1(n,:);
-            end
-
-            for n = 1:length(mean2)
-                CD2(n,:) = PCMin2(n,:) - PCMax2(n,:);
-            end
+            CD1 = PCMin1 - PCMax1;
+            CD2 = PCMin2 - PCMax2;
 
             %% Relative Principal Curvatures
+            % Uses the angle between the two surfaces' normals at each pair:
+            % the normal of the face whose center is nearest each node.
+            % Face centers/normals only change with the frame, so they are
+            % computed once here rather than for every pair.
+            face_center1 = incenter(bone_STL1);
+            face_normal1 = faceNormal(bone_STL1);
+            face_center2 = incenter(bone_STL2);
+            face_normal2 = faceNormal(bone_STL2);
+
             RPCMin = zeros(length(mean1),1);
             RPCMax = zeros(length(mean1),1);
 
             for n = 1:length(mean1)
-                u = bone_STL2.Points(i_surf(n,3),:);
-                v = bone_STL1.Points(i_surf(n,2),:);
-
-                temp_center1 = incenter(bone_STL1);
-                tdist1 = pdist2(v, temp_center1,'euclidean');
-                tdist1 = find(tdist1 == min(tdist1));
-                temp_face1 = faceNormal(bone_STL1);
-                v = temp_face1(tdist1(1),:);
-
-                temp_center2 = incenter(bone_STL2);
-                tdist2 = pdist2(u, temp_center2,'euclidean');
-                tdist2 = find(tdist2 == min(tdist2));
-                temp_face2 = faceNormal(bone_STL2);
-                u = temp_face2(tdist2(1),:);
-                
-
-                % figure()
-                % plot3(bone_STL2.Points(:,1),bone_STL2.Points(:,2),bone_STL2.Points(:,3),'.')
-                % hold on
-                % plot3(bone_STL2.Points(i_surf(n,3),1),bone_STL2.Points(i_surf(n,3),2),bone_STL2.Points(i_surf(n,3),3),'*r')
-                % hold on
-                % plot3(temp_center1(tdist1(1),1),temp_center1(tdist1(1),2),temp_center1(tdist1(1),3),'*')
-                % hold on            
-                % plot3(bone_STL1.Points(:,1),bone_STL1.Points(:,2),bone_STL1.Points(:,3),'.')
-                % hold on
-                % plot3(bone_STL1.Points(i_surf(n,2),1),bone_STL1.Points(i_surf(n,2),2),bone_STL1.Points(i_surf(n,2),3),'og')            
-                % axis equal    
+                [~, nearest2] = min(pdist2(bone_STL2.Points(i_surf(n,3),:), face_center2, 'euclidean'));
+                [~, nearest1] = min(pdist2(bone_STL1.Points(i_surf(n,2),:), face_center1, 'euclidean'));
+                u = face_normal2(nearest2,:);
+                v = face_normal1(nearest1,:);
 
                 alpha = acosd(dot(u,v)/(norm(u)*norm(v)));
                 delta = sqrt(CD1(n)^2 + CD2(n)^2 + 2*CD1(n)*CD2(n)*cosd(2*alpha));
@@ -1009,15 +919,8 @@ for group_count = 1:length(groups)
             end
 
             %% Overall Congruence Index at a Pair
-            RMS = zeros(length(mean1),1);
-
-            for n = 1:length(mean1)
-                RMS(n,:) = sqrt((RPCMin(n,:)^2 + RPCMax(n,:)^2)/2);
-            end
-
-            for n = 1:length(i_surf(:,1))
-                    i_surf(n,5) = real(RMS(n,:));
-            end
+            RMS = sqrt((RPCMin.^2 + RPCMax.^2)/2);
+            i_surf(:,5) = real(RMS);
 
             % Structure of the data being stored
             % i_surf(:,1) == the correspondence particle index identified to the 'identified node' .stl coordinate index
@@ -1031,7 +934,7 @@ for group_count = 1:length(groups)
             Data.(subjects{subj_count}).MeasureData.(sprintf('F_%d',frame_count)).Data.Congruence   = i_surf(:,5);
 
             %% Clear Variables and Save Every X Number of Frames
-            clearvars -except pool data_dir fldr_name subjects bone_names ...
+            clearvars -except pool data_dir fldr_name subjects subj_names subj_name subj_dir bone_names ...
                 Data subj_count frame_count g subj_group bone_STL1 bone_STL2 ...
                 frame_start overwrite_data TempData save_interval ...
                 coverage_area_check kine_data_length save_stl_frame save_stl ...
@@ -1048,8 +951,8 @@ for group_count = 1:length(groups)
             if rem(frame_count,save_interval) == 0
                 fprintf('     saving .mat file backup...\n')
                 Data.(subjects{subj_count}).bone_names  = bone_names;
-                SaveData.Data.(subjects{subj_count})    = Data.(subjects{subj_count});
-                save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,groups{group_count},subjects{subj_count},bone_names{1},bone_names{2},(subjects{subj_count})),'-struct','SaveData');
+                SaveData.Data.(subj_name)               = Data.(subjects{subj_count});
+                save(fullfile(subj_dir,sprintf('Data_%s_%s_%s.mat',bone_names{1},bone_names{2},subj_name)),'-struct','SaveData');
                 clear SaveData
             end
 
@@ -1067,14 +970,17 @@ for group_count = 1:length(groups)
         end
 
     %% Save Data at the End
-    SaveData.Data.(subjects{subj_count}) = Data.(subjects{subj_count});
-    save(sprintf('%s\\%s\\%s\\Data_%s_%s_%s.mat',data_dir,groups{group_count},subjects{subj_count},bone_names{1},bone_names{2},subjects{subj_count}),'-struct','SaveData');    
+    % Per-subject file, stored under the subject's folder name
+    Data.(subjects{subj_count}).bone_names = bone_names;
+    SaveData.Data.(subj_name) = Data.(subjects{subj_count});
+    save(fullfile(subj_dir,sprintf('Data_%s_%s_%s.mat',bone_names{1},bone_names{2},subj_name)),'-struct','SaveData');    
     clear SaveData
 
     end
 end
 
 %% Save Data.structure to .mat
+% All subjects (keyed <Group>_<Subject>) and the group lists
 SaveData.Data = Data;
 SaveData.subj_group = subj_group;
 save(sprintf('%s\\Outputs\\JMA_01_Outputs\\Data_%s_%s.mat',data_dir,bone_names{1},bone_names{2}),'-struct','SaveData');
@@ -1082,3 +988,13 @@ clear SaveData
 
 delete(gcp('nocreate'))
 fprintf('Complete!\n')
+
+%% Helper Functions
+function area = localFaceArea(bone_STL, face_ids)
+% Total surface area of the listed faces of a triangulation
+tri = bone_STL.ConnectivityList(face_ids,:);
+P1  = bone_STL.Points(tri(:,1),:);
+P2  = bone_STL.Points(tri(:,2),:);
+P3  = bone_STL.Points(tri(:,3),:);
+area = sum(1/2*sqrt(sum(cross(P2 - P1, P3 - P1, 2).^2, 2)));
+end

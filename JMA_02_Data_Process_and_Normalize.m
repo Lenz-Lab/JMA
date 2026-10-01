@@ -1,15 +1,34 @@
 %% Joint Measurement Analysis #2 - Data Process and Normalization
-% Normalizes and truncates data to consistent percentages of stance for
-% data measured from the JMA_01_Kinematics_to_SSM.m script.
+% Normalizes the per-frame measurements from JMA_01_Kinematics_to_SSM.m to
+% percent of stance, truncates every subject to the common stance range,
+% interpolates them to the same number of frames, and pools them by group.
+%
+% Inputs (selected through dialogs):
+%   One folder per study group, each holding one folder per subject with
+%   that subject's JMA_01 output: Data_<Bone1>_<Bone2>_<Subject>.mat
+%
+% Outputs (<data_dir>\Outputs\JMA_02_Outputs\):
+%   Normalized_Data_<Bone1>_<Bone2>_<Groups>.mat
+%       DataOut         per subject:  DataOut.<measure>.<SubjectKey>  {particles x frames}
+%       DataOut_Mean    group means:  DataOut_Mean.<measure>.<Group>  [particles x frames]
+%       DataOut_SPM     group values at particles where every subject has data
+%       DataOutAll      every (positive) value of each measure, pooled
+%       subj_group      <Group>.SubjectList (folder names) and
+%                       <Group>.SubjectKey  (<Group>_<Subject>, the DataOut field names)
+%   Coverage_Area_*.csv, MeanDistance_PerPatient_*.xlsx
+%
+% Subjects are stored under <Group>_<Subject> so that the same subject can
+% appear in several groups (e.g. a within-subject design with one group
+% per condition) without one group's data overwriting another's.
 
 % Created by: Rich Lisonbee
 % University of Utah - Lenz Research Group
-% Date: 5/26/2022  
+% Date: 5/26/2022
 
-% Modified By: 
-% Version: 
-% Date: 
-% Notes: 
+% Modified By:
+% Version:
+% Date:
+% Notes:
 
 %% Clean Slate
 clc; close all; clear;
@@ -54,9 +73,6 @@ append_name         = set_inp.AppendName;
 
 data_dir = string(uigetdir(pwd, 'Please select the directory where the data is located'));
 
-addpath(sprintf('%s\\Mean_Models',data_dir))
-addpath(data_dir)
-
 %% Selecting Data
 fldr_name = cell(study_num,1);
 for n = 1:study_num
@@ -65,72 +81,71 @@ for n = 1:study_num
     if fldr_name{n} == 0
         error('Study group selection cancelled');
     end
-    addpath(fldr_name{n})
 end
 
 %% Loading Data
+% Each subject is stored as Data.<Group>_<Subject>. Files are loaded by
+% full path, so a same-named file in another group's folder is never
+% picked up instead.
 fprintf('Loading Data:\n')
+Data = struct();
 for n = 1:study_num
-    D = dir(fullfile(sprintf('%s\\',fldr_name{n})));
-    
-    m = 1;
-    pulled_files = cell(length(D)-2,1);
-    for k = 3:length(D)
-        pulled_files{m} = D(k).name;
-        m = m + 1;
-    end
-    
     temp = strsplit(fldr_name{n},'\');
-    subj_group.(string(temp(end))).SubjectList = pulled_files;
-    
-    %% Load Data for Each Subject
-    for m = 1:length(pulled_files)
-        %%
-        fprintf('   %s\n',pulled_files{m})
-        addpath(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}))
-        
-        %% Load
-        K = dir(fullfile(sprintf('%s\\%s\\',fldr_name{n},pulled_files{m}),'*.mat'));
-        if isempty(K) == 0
-            %%
-            for c = 1:length(K)
-                temp = strsplit(K(c).name,'.');
-                temp = strrep(temp(1),' ','_');
-                temp = split(temp{1},'_');
-                if isequal(lower(temp{2}),lower(bone_names{1})) && isequal(lower(temp{3}),lower(bone_names{2}))
-                    data = load(K(c).name);
-                    g = fieldnames(data.Data);
-                    Data.(string(g)) = data.Data.(string(g));
-                    clear data
+    group_name = matlab.lang.makeValidName(temp{end});
+
+    D = dir(fldr_name{n});
+    D = D([D.isdir] & ~startsWith({D.name},'.'));
+
+    subj_list = {};
+    subj_key  = {};
+    for m = 1:length(D)
+        subj = D(m).name;
+        fprintf('   %s\n',subj)
+
+        % The subject's JMA_01 output: Data_<Bone1>_<Bone2>_<Subject>.mat
+        K = dir(fullfile(D(m).folder,subj,'*.mat'));
+        for c = 1:length(K)
+            name_parts = split(strrep(extractBefore(string(K(c).name),'.'),' ','_'),'_');
+            if length(name_parts) >= 3 && strcmpi(name_parts(2),bone_names{1}) && strcmpi(name_parts(3),bone_names{2})
+                data = load(fullfile(K(c).folder,K(c).name));
+                inner_name = fieldnames(data.Data);
+                if ~strcmp(inner_name{1},subj)
+                    warning('JMA02:SubjectMismatch', ['%s\\%s\\%s holds data for subject "%s", not "%s". ' ...
+                        'Check that this file is the right one for this subject.'], group_name, subj, K(c).name, inner_name{1}, subj);
                 end
+
+                key = matlab.lang.makeValidName(sprintf('%s_%s',group_name,subj));
+                Data.(key) = data.Data.(inner_name{1});
+                if ~any(strcmp(subj_key,key))
+                    subj_list{end+1,1} = subj;
+                    subj_key{end+1,1}  = key;
+                end
+                clear data
             end
         end
+        if ~any(strcmp(subj_list,subj))
+            warning('JMA02:NoData','No Data_%s_%s_*.mat found for %s\\%s; skipping it.', bone_names{1}, bone_names{2}, group_name, subj);
+        end
     end
+
+    subj_group.(group_name).SubjectList = subj_list; % subject folder names
+    subj_group.(group_name).SubjectKey  = subj_key;  % field names in Data / DataOut
 end
 
-subjects = fieldnames(Data);
+subjects = fieldnames(Data); % all subject keys, every group
 
 %% Troubleshoot Mode
+% Plot each subject's particles with frame 1's paired particles circled, so
+% the user can confirm the pairing landed on the joint of interest
 if troubleshoot_mode == 1
     close all
     for subj_count = 1:length(subjects)
         figure()
-        % B.faces        = Data.(subjects{subj_count}).(bone_names{1}).(bone_names{1}).ConnectivityList;
-        % B.vertices     = Data.(subjects{subj_count}).(bone_names{1}).(bone_names{1}).Points;
-        % patch(B,'FaceColor', [0.85 0.85 0.85], ...
-        % 'EdgeColor','none',...        
-        % 'FaceLighting','gouraud',...
-        % 'FaceAlpha',1,...
-        % 'AmbientStrength', 0.15);
-        % material('dull');
-        % alpha(0.5);
-        % hold on
         CP_points = Data.(subjects{subj_count}).(bone_names{1}).CP;
         plot3(CP_points(:,1),CP_points(:,2),CP_points(:,3),'.k')
         hold on
         CP = Data.(subjects{subj_count}).MeasureData.F_1.Pair(:,1);
         plot3(CP_points(CP,1),CP_points(CP,2),CP_points(CP,3),'ob','linewidth',2)
-        % set(gcf,'Units','Normalized','OuterPosition',[-0.0036 0.0306 0.5073 0.9694]); %[-0.0036 0.0306 0.5073 0.9694]
         axis equal
         set(gca,'xtick',[],'ytick',[],'ztick',[],'xcolor','none','ycolor','none','zcolor','none')
         camlight(0,0)
@@ -145,30 +160,34 @@ if troubleshoot_mode == 1
     elseif isequal(q,'Yes')
         fprintf('Continuing from troubleshoot:\n')
         close all
-    end    
+    end
 end
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%% Data Analysis %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('Data Analysis:\n')
-g = fieldnames(Data);
-MeanCP = length(Data.(g{1}).(bone_names{1}).CP(:,1));
+MeanCP = length(Data.(subjects{1}).(bone_names{1}).CP(:,1)); % number of correspondence particles
 
 %% Normalize Data
+% Convert each tracked frame to percent of stance:
+%   100*(frame - heel strike)/(toe off - heel strike)
+% Event = [first tracked frame, heel strike, toe off, last tracked frame].
+% Without events (or with [1 1 1 1]) the whole trial is used.
 fprintf('Normalizing data...\n')
 for subj_count = 1:length(subjects)
+    n_measured = length(fieldnames(Data.(subjects{subj_count}).MeasureData));
     if isfield(Data.(subjects{subj_count}),'Event') == 1
         frames = Data.(subjects{subj_count}).Event;
         % Fixed so it goes to length of the activity.
         if isequal(Data.(subjects{subj_count}).Event,[1 1 1 1])
-            frames = [1 1 length(fieldnames(Data.(subjects{subj_count}).MeasureData)) length(fieldnames(Data.(subjects{subj_count}).MeasureData))];
-        end        
-    elseif isfield(Data.(subjects{subj_count}),'Event') == 0
+            frames = [1 1 n_measured n_measured];
+        end
+    else
         frames = [1 1 1 1];
-        if length(fieldnames(Data.(subjects{subj_count}).MeasureData)) > 1
-            frames = [1 1 length(fieldnames(Data.(subjects{subj_count}).MeasureData)) length(fieldnames(Data.(subjects{subj_count}).MeasureData))];
+        if n_measured > 1
+            frames = [1 1 n_measured n_measured];
         end
     end
-    
+
     k = 1;
     if frames(:,4) > frames(:,1)
         for m = frames(:,1):frames(:,4)
@@ -182,6 +201,7 @@ for subj_count = 1:length(subjects)
 end
 
 %% Truncate Data
+% Keep only the stance range every subject covers
 temp_min = zeros(1,length(subjects));
 temp_max = zeros(1,length(subjects));
 
@@ -189,10 +209,6 @@ for subj_count = 1:length(subjects)
     temp_min(:,subj_count) = min(min(cell2mat(Frames.(subjects{subj_count})(:,1))));
     temp_max(:,subj_count) = max(max(cell2mat(Frames.(subjects{subj_count})(:,1))));
 end
-
-% identifies minimum and maximum to truncate to
-min_cut = max(temp_min);
-max_cut = min(temp_max);
 
 % Truncate Data
 ind = cell(1,length(subjects));
@@ -204,88 +220,73 @@ for subj_count = 1:length(subjects)
     data.(subjects{subj_count}).Frame(:,1) = cell2mat(ind(:,subj_count));
     data.(subjects{subj_count}).Frame(:,2) = cell2mat(Frames.(subjects{subj_count})(cell2mat(ind(:,subj_count)),1));
     % [(frame #) (normalized stance)]
-    
+
     % Initialize variable for interpolation
     temp_length(subj_count) = length(cell2mat(ind(:,subj_count)));
 end
 
+% Every subject is interpolated to the longest truncated length
 max_frames = max(temp_length);
 
 %% Move Data structure to data structure for data manipulation
+% data.<subject>.CP.F_<frame> = [particle index, measure 1, measure 2, ...]
+% with NaN measurements set to 0
 for n = 1:length(subjects)
     f = fieldnames(Data.(subjects{n}).MeasureData);
-    for m = 1:length(f)   
+    for m = 1:length(f)
         % Correspondence Particle Index
         data.(subjects{n}).CP.(f{m})(:,1) = Data.(subjects{n}).MeasureData.(f{m}).Pair(:,1);
         g = fieldnames(Data.(subjects{n}).MeasureData.(f{m}).Data);
 
-        % if n == 1
-        %     gn = g;
-        % end
-
         for k = 1:length(g)
-            for p = 1:length(Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1))
-                nan_temp = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(p,1);
-                nan_temp(isnan(nan_temp)) = 0;
-                data.(subjects{n}).CP.(f{m})(p,k+1) = nan_temp;
-            end           
+            vals = Data.(subjects{n}).MeasureData.(f{m}).Data.(g{k})(:,1);
+            vals(isnan(vals)) = 0;
+            data.(subjects{n}).CP.(f{m})(1:length(vals),k+1) = vals;
         end
     end
 end
 
 %% Waitbar Preloading - Interpolating
-% waitbar calculations
-g = fieldnames(Data);
-c = fieldnames(Data.(subjects{1}).MeasureData.(f{1}).Data);
-
-waitbar_length = (length(g))*length(c);
-
+measures = fieldnames(Data.(subjects{1}).MeasureData.F_1.Data);
+waitbar_length = length(subjects)*length(measures);
 waitbar_count = 1;
-
 W = waitbar(waitbar_count/waitbar_length,'Interpolating Data...');
 
 %% Interpolate Individual Data Across Population to Match Length
+% Resample each subject's truncated frames to max_frames, particle by
+% particle. Output: DataOut.<measure>.<subject key> = {particles x frames}
 fprintf('Interpolating Data\n')
-g = fieldnames(Data.(subjects{1}).MeasureData.(f{1}).Data);
 
 for n = 1:length(subjects)
     fprintf('    %s\n',subjects{n})
-    f = fieldnames(Data.(subjects{n}).MeasureData);
     if length(data.(subjects{n}).Frame(:,1)) > 1
         IntData.(subjects{n}).Frame(:,1) = interp1((1:numel(data.(subjects{n}).Frame(:,2))),data.(subjects{n}).Frame(:,2),linspace(1,numel(data.(subjects{n}).Frame(:,2)), numel(1:max_frames)), 'linear')';
     else
         IntData.(subjects{n}).Frame(:,1) = 1;
-    end    
-    
-    g = fieldnames(Data.(subjects{n}).MeasureData.(f{1}).Data);
+    end
+
+    g = fieldnames(Data.(subjects{n}).MeasureData.F_1.Data);
     for CItoDist = 1:length(g)
-        temp = cell(1,length(data.(subjects{n}).Frame(:,1)));
-        for m = 1:length(data.(subjects{n}).Frame(:,1))
-	        temp(:,m) = {[data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,1) data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)))(:,CItoDist+1)]};
-            % temp(:,m) = {[data.(subjects{n}).CP.F_1(:,1) data.(subjects{n}).CP.F_1(:,CItoDist+1)]};
-        end
-        
+        % cp{particle, frame} = this measure's value (empty if not paired)
         cp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));
-        
         for m = 1:length(data.(subjects{n}).Frame(:,1))
-            a = temp{1,m};
-            for aa = 1:length(a(:,1))
-                cp(a(aa,1),m) = {a(aa,2)};
-            end
+            frame_cp = data.(subjects{n}).CP.(sprintf('F_%d',data.(subjects{n}).Frame(m,1)));
+            cp(frame_cp(:,1),m) = num2cell(frame_cp(:,CItoDist+1));
         end
-        
+
     %% Create Regions to Interpolate
     % Otherwise it will interpolate the data of one CP for the entire
     % timeframe, not ideal when some CP are not in articulation during the
     % entire trial
     % WARNING: This section of code is a hot mess!
-        
-        int_temp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));          
-        
-        if length(IntData.(subjects{n}).Frame(:,1)) == 1    
+
+        int_temp = cell(MeanCP,length(data.(subjects{n}).Frame(:,1)));
+
+        if length(IntData.(subjects{n}).Frame(:,1)) == 1
+            % Static: a single frame, nothing to interpolate
             for inter_v = 1:length(data.(subjects{n}).CP.F_1)
                 int_temp(data.(subjects{n}).CP.F_1(inter_v,1),:) = {data.(subjects{n}).CP.F_1(inter_v,CItoDist+1)};
-            end        
+            end
             DataOut.(g{CItoDist}).(subjects{n}) = int_temp;
         else
             % Split into clusters and interpolate across the entire
@@ -296,6 +297,8 @@ for n = 1:length(subjects)
             % of stance. A lot of different variables are used for counting
             % and storage.
             for h = 1:length(cp(:,1))
+                % Find each run of consecutive frames with data at particle h:
+                % c_start(i)/c_end(i) are the first/last frame of run i
                 ch = 0;
                 bbb = 1;
                 bb = 1;
@@ -320,27 +323,30 @@ for n = 1:length(subjects)
                         end
                         bb = bb + 1;
                     end
-                end   
-        
+                end
+
                 perc_temp = IntData.(subjects{n}).Frame(:,1);
-        
+
+                % Stretch each run onto the matching stretch of the common
+                % stance axis. Note: if any run is a single frame, the
+                % whole particle is skipped (left empty).
                 if isempty(c_end) == 0
                     c = find(c_end(:,1) == c_start(:,1));
                     if isempty(c) == 1
                         for bu = 1:length(c_start)
                         perc_start = 100*(c_start(bu,:)/length(data.(subjects{n}).Frame(:,1)));
                         perc_end = 100*(c_end(bu,:)/length(data.(subjects{n}).Frame(:,1)));
-        
+
                         A = repmat(perc_start,[1 length(perc_temp)]);
                         [~,closest_start] = min(abs(A-perc_temp'));
-        
+
                         A = repmat(perc_end,[1 length(perc_temp)]);
                         [~,closest_end] = min(abs(A-perc_temp'));
-        
+
                         x = cell2mat(cp(h,(c_start(bu):c_end(bu))));
-        
+
                         X = interp1((1:numel(x)),x, linspace(1,numel(x), numel(1:(closest_end - closest_start + 1))), 'linear')';
-        
+
                         Z = (closest_start:closest_end);
                             for z = 1:length(X)
                                 int_temp(h,Z(z)) = {X(z)};
@@ -350,138 +356,110 @@ for n = 1:length(subjects)
                 end
             clear c_temp c_start
             end
-            DataOut.(g{CItoDist}).(subjects{n}) = int_temp;    
+            DataOut.(g{CItoDist}).(subjects{n}) = int_temp;
             clear int_temp
-        end   
+        end
 
     % waitbar update
     if isgraphics(W) == 1
         W = waitbar(waitbar_count/waitbar_length,W,'Interpolating Data...');
     end
     waitbar_count = waitbar_count + 1;
-    
+
     end
 end
 
 %%
 close all
-clearvars -except pool data_dir subjects bone_names Data subj_count frame_count MeanCP DataOut IntData data subj_group max_frames perc_temp bone_names g troubleshoot_mode append_name
+clearvars -except data_dir subjects bone_names Data MeanCP DataOut IntData subj_group max_frames troubleshoot_mode append_name
 
 %% Calculate Mean Congruence and Distance at Each Common Correspondence Particle
+% DataOut_Mean.<measure>.<group>(n,m): group mean at particle n, frame m
+%   (0 if fewer than 2 subjects have a value there). For the first two
+%   measures, zeros are not counted in the mean.
+% DataOut_SPM.<measure>.<group>{n,m}: {values} when every subject in the
+%   group has a usable value there, otherwise {[]}
 fprintf('Calculating Mean Data... \n')
 
 DataOut_SPM = [];
+measures = fieldnames(DataOut);
+group_names = fieldnames(subj_group);
+for study_pop = 1:length(group_names)
+    group = group_names{study_pop};
+    keys = subj_group.(group).SubjectKey;
+    fprintf('    %s\n',group)
 
-g = fieldnames(subj_group);
-for study_pop = 1:length(g)
-    subjects = subj_group.(g{study_pop}).SubjectList;
-    
-    fprintf('    %s\n',g{study_pop})
-    %%
-    gg = fieldnames(DataOut);
-    for CItoDist = 1:length(gg)
+    for CItoDist = 1:length(measures)
+        [vals, present] = localSubjectArray(DataOut.(measures{CItoDist}), keys, MeanCP, max_frames);
+
+        usable = present & ~isnan(vals);
+        if CItoDist <= 2
+            usable = usable & vals ~= 0;
+        end
+        n_present = sum(present,3);
+        n_usable  = sum(usable,3);
+
+        vals(~usable) = 0;
+        group_mean = sum(vals,3)./n_usable;      % NaN where nothing is usable
+        group_mean(n_present < 2) = 0;
+        DataOut_Mean.(measures{CItoDist}).(group) = group_mean;
+
+        spm_cells = cell(MeanCP,max_frames);
         for n = 1:MeanCP
             for m = 1:max_frames
-                temp = [];
-                ss = 1;
-                for s = 1:length(subjects)
-                    if isfield(DataOut.(gg{CItoDist}),subjects{s})
-                        t = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
-                        if isempty(cell2mat(t)) == 0
-                            temp(ss,:) = cell2mat(t);
-                            ss = ss + 1;
-                        end
-                    end
-                end
-                DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = 0;
-                
-                if isempty(temp) == 0 
-                    if length(temp) >= 2
-                        y = find(temp == 0);
-                        if isempty(y) == 0 && CItoDist <= 2
-                            temp(y) = [];
-                        end
-                        temp(find(isnan(temp))) = [];
-                        DataOut_Mean.(gg{CItoDist}).(g{study_pop})(n,m) = mean(temp);
-                        DataOut_SPM.(gg{CItoDist}).(g{study_pop}){n,m} = {[]};
-                        if length(temp) == floor(length(subjects)) % How many articulating CP in order to be included
-                            DataOut_SPM.(gg{CItoDist}).(g{study_pop}){n,m} = {temp};
-                        end
+                if n_present(n,m) >= 2
+                    if n_usable(n,m) == length(keys) % How many articulating CP in order to be included
+                        spm_cells{n,m} = {squeeze(vals(n,m,:))};
+                    else
+                        spm_cells{n,m} = {[]};
                     end
                 end
             end
         end
+        DataOut_SPM.(measures{CItoDist}).(group) = spm_cells;
     end
 end
 
 %% Check length of data for SPM Analysis
-% Need to iterate through each CPindex and frame within each group. Then
-% compare across each group and save the data....
-% SPM needs to have data for each person at a particle for it to be
-% compared. So SPM_check_list will have a 1 at that particle at that frame
-% if it does.
+% SPM needs data from every subject at a particle for it to be compared.
+% SPM_check_list.<group>{n,m} is 1 where every subject has a value for the
+% first measure at that particle/frame, otherwise 0.
 fprintf('Verifying length for SPM analysis...\n')
-gg = fieldnames(DataOut);
-gg_check = gg(1);
-g = fieldnames(subj_group);
-for study_pop = 1:length(g)
-    for n = 1:MeanCP
-        for m = 1:max_frames
-            k = 1;
-            gg = subj_group.(g{study_pop}).SubjectList;
-            gg_find = [];
-            for subj_count = 1:length(gg)
-                temp = cell2mat(DataOut.(string(gg_check)).(gg{subj_count})(n,m));
-                if isempty(temp) == 0
-                    gg_find(k,:) = temp;
-                    k = k + 1;
-                    clear temp
-                end
-            end
-            SPM_check_list.(g{study_pop}){n,m} = 0;
-            if length(gg_find) == length(gg)
-                SPM_check_list.(g{study_pop}){n,m} = 1;
-            end
-        end
-    end
+for study_pop = 1:length(group_names)
+    group = group_names{study_pop};
+    keys = subj_group.(group).SubjectKey;
+    [~, present] = localSubjectArray(DataOut.(measures{1}), keys, MeanCP, max_frames);
+    SPM_check_list.(group) = num2cell(double(sum(present,3) == length(keys)));
 end
 
 %% Calculate Overall Mean and STD From All Data
+% DataOutAll.<measure>: every positive value of the measure, from every
+% subject in every group (used by JMA_03 for the suggested color limits)
 fprintf('Consolidating Data...\n')
-g = fieldnames(subj_group);
-gg = fieldnames(DataOut);
-for study_pop = 1:length(g)
-subjects = subj_group.(g{study_pop}).SubjectList;
-
-    for CItoDist = 1:length(gg)
-        k = 1;
-        for n = 1:MeanCP
-            for m = 1:max_frames
-                for s = 1:length(subjects)
-                    temp = DataOut.(gg{CItoDist}).(subjects{s})(n,m);
-                    if isempty(cell2mat(temp)) == 0
-                        if cell2mat(temp) > 0
-                            DataOutAll.(gg{CItoDist})(k,:) = cell2mat(temp);
-                            k = k + 1;
-                        end
-                    end
-                end
-            end
-        end
+for CItoDist = 1:length(measures)
+    all_vals = [];
+    for study_pop = 1:length(group_names)
+        keys = subj_group.(group_names{study_pop}).SubjectKey;
+        [vals, present] = localSubjectArray(DataOut.(measures{CItoDist}), keys, MeanCP, max_frames);
+        % Same order as looping particle -> frame -> subject
+        vals = permute(vals,[3 2 1]);
+        keep = permute(present,[3 2 1]) & vals > 0;
+        all_vals = [all_vals; vals(keep)];
     end
+    DataOutAll.(measures{CItoDist}) = all_vals;
 end
 
 %% Save Coverage Areas to Spreadsheet
-templength = zeros(1,length(g));
-g = fieldnames(Data);
-for g_count = 1:length(g)
-    gg = fieldnames(Data.(g{g_count}).CoverageArea);
-    templength(g_count) = length(gg);  
+% One column per subject (two if coverage was calculated on both bones),
+% one row per frame
+templength = zeros(1,length(subjects));
+for g_count = 1:length(subjects)
+    templength(g_count) = length(fieldnames(Data.(subjects{g_count}).CoverageArea));
 end
 
-surf_area = cell(max(templength)+2,g_count);
-g = fieldnames(Data);
-if length(Data.(g{g_count}).CoverageArea.F_1) == 1
+surf_area = cell(max(templength)+2,length(subjects));
+g = subjects;
+if length(Data.(g{end}).CoverageArea.F_1) == 1
     for g_count = 1:length(g)
         gg = fieldnames(Data.(g{g_count}).CoverageArea);
         surf_area{1,g_count} = g{g_count};
@@ -489,12 +467,12 @@ if length(Data.(g{g_count}).CoverageArea.F_1) == 1
         for frame_count = 1:length(gg)
             if iscell(Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1)) == 1
                 surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(gg{frame_count}){:,1};
-            else 
+            else
                 surf_area{frame_count+2,g_count}                = Data.(g{g_count}).CoverageArea.(gg{frame_count})(:,1);
             end
         end
     end
-elseif length(Data.(g{g_count}).CoverageArea.F_1) == 2
+elseif length(Data.(g{end}).CoverageArea.F_1) == 2
     g_spacer = 1:2:2*length(g);
     for g_count = 1:length(g)
         gg = fieldnames(Data.(g{g_count}).CoverageArea);
@@ -516,14 +494,13 @@ end
 %% Save Data to .mat Files
 fprintf('Saving Results\n')
 
-MF = dir(fullfile(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir)));
-if isempty(MF) == 1
-    mkdir(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir));
+out_dir = fullfile(data_dir,'Outputs','JMA_02_Outputs');
+if ~exist(out_dir,'dir')
+    mkdir(out_dir);
 end
 
-addpath(sprintf('%s\\Outputs\\JMA_02_Outputs\\',data_dir))
-
-perc_temp           = IntData.(subjects{1}).Frame(:,1);
+% Stance axis saved with the results: the first subject of the last group
+perc_temp           = IntData.(subj_group.(group_names{end}).SubjectKey{1}).Frame(:,1);
 
 % Rows are correspondence particle indices
 % Columns are percentages of the normalized activity
@@ -537,25 +514,19 @@ A.perc_stance       = perc_temp;        % Common percentages of the normalized a
 A.max_frames        = max_frames;       % The total number of common percentages, used for iterating in further scripts
 A.SPM_check_list    = SPM_check_list;   % Logical cell array identifying particles at specific time points that are suitable for SPM analysis
 A.bone_names        = bone_names;       % The bone names of the analyzed joint
-A.subj_group        = subj_group;       % The study group names and the participant identifiers within each group
+A.subj_group        = subj_group;       % The study group names, subject folder names (SubjectList) and DataOut keys (SubjectKey)
 
-g = fieldnames(subj_group);
-temp_name = '';
-for n = 1:length(g)
-    temp_n = sprintf('_%s',string(g(n)));
-    temp_name = strcat(temp_name,temp_n);
-end
+% Output file suffix: _<Group1>_<Group2>..._<AppendName>
+temp_name = sprintf('_%s',group_names{:});
 if ~isequal(append_name,'')
     temp_name = strcat(temp_name,'_',append_name);
 end
 
-writecell(surf_area,sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Coverage_Area_%s_%s%s.csv',bone_names{1},bone_names{2},temp_name)));
+writecell(surf_area,fullfile(out_dir,sprintf('Coverage_Area_%s_%s%s.csv',bone_names{1},bone_names{2},temp_name)));
 
 
 %% Per-subject mean distance
 fprintf('\nComputing mean distance per subject...\n')
-
-group_names = fieldnames(subj_group);
 
 SubjectName = {};
 GroupName   = {};
@@ -568,15 +539,14 @@ NValues     = [];
 for g_count = 1:numel(group_names)
     gname = group_names{g_count};
     subj_list = subj_group.(gname).SubjectList;
+    keys      = subj_group.(gname).SubjectKey;
 
     for s = 1:numel(subj_list)
-        subj = subj_list{s};
-
-        raw_dist = DataOut.Distance.(subj);  % cell (particles x frames)
+        raw_dist = DataOut.Distance.(keys{s});  % cell (particles x frames)
         v = cell2mat(raw_dist(:));
         v = v(isfinite(v));
 
-        SubjectName{end+1,1} = subj;
+        SubjectName{end+1,1} = subj_list{s};
         GroupName{end+1,1}   = gname;
 
         if ~isempty(v)
@@ -599,9 +569,6 @@ T_dist = table(SubjectName, GroupName, MeanDist, SDDist, MinDist, MaxDist, NValu
     'VariableNames', {'Subject','Group','Mean_Distance_mm','SD_Distance_mm','Min_Distance_mm','Max_Distance_mm','N_Values'});
 
 % Save to Excel
-out_dir = fullfile(data_dir,'Outputs','JMA_02_Outputs');
-if ~exist(out_dir,'dir'); mkdir(out_dir); end
-
 excel_out = fullfile(out_dir, sprintf('MeanDistance_PerPatient_%s_%s%s.xlsx', ...
     bone_names{1}, bone_names{2}, temp_name));
 writetable(T_dist, excel_out);
@@ -609,5 +576,21 @@ fprintf('Saved: %s\n', excel_out);
 A.MeanDistance_PerPatient = T_dist;
 
 %% Save
-save(sprintf('%s\\Outputs\\JMA_02_Outputs\\%s',data_dir,sprintf('Normalized_Data_%s_%s%s.mat',bone_names{1},bone_names{2},temp_name)),'-struct','A');
+save(fullfile(out_dir,sprintf('Normalized_Data_%s_%s%s.mat',bone_names{1},bone_names{2},temp_name)),'-struct','A');
 fprintf('Complete!\n')
+
+%% Helper Functions
+function [vals, present] = localSubjectArray(measure_data, keys, n_cp, n_frames)
+% (particles x frames x subjects) values of one measure for a group, NaN
+% where a subject has no value; present marks the non-empty cells
+vals    = nan(n_cp, n_frames, length(keys));
+present = false(n_cp, n_frames, length(keys));
+for s = 1:length(keys)
+    C = measure_data.(keys{s})(1:n_cp,1:n_frames);
+    filled = ~cellfun(@isempty,C);
+    v = nan(n_cp,n_frames);
+    v(filled) = [C{filled}];
+    vals(:,:,s)    = v;
+    present(:,:,s) = filled;
+end
+end

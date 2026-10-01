@@ -13,12 +13,12 @@ Run the scripts in order from the repository folder. Each one prompts for its in
 
 | Script | What it does | Main output |
 | --- | --- | --- |
-| [Scripts/JMA_00_DSX_PreProcess.m](Scripts/JMA_00_DSX_PreProcess.m) | Optional. Converts DSX transform exports into the per-bone kinematics `.txt` files. | Kinematics `.txt` files |
+| [Scripts/JMA_00_DSX_PreProcess.m](Scripts/JMA_00_DSX_PreProcess.m) | Optional. Converts DSX transform exports into the per-bone kinematics `.txt` files. **Overwrites the files in place**, so keep a copy of the raw exports. | Kinematics `.txt` files |
 | [JMA_01_Kinematics_to_SSM.m](JMA_01_Kinematics_to_SSM.m) | Applies the kinematics to each subject's bones and calculates distance and congruence at every correspondence particle, frame by frame. | `<Subject>\Data_<Bone1>_<Bone2>_<Subject>.mat`, `Outputs\JMA_01_Outputs\Data_<Bone1>_<Bone2>.mat` |
 | [JMA_01a_Import_User_Data.m](JMA_01a_Import_User_Data.m) | Optional. Adds your own per-particle data (e.g. FEA, cortical thickness) from `.xlsx`/`.csv` to the JMA_01 outputs. | Updated JMA_01 `.mat` files |
 | [JMA_02_Data_Process_and_Normalize.m](JMA_02_Data_Process_and_Normalize.m) | Normalizes every subject to percent of stance and pools the data by group. | `Outputs\JMA_02_Outputs\Normalized_Data_<Bone1>_<Bone2>*.mat` |
 | [JMA_03_Statistical_Analyses.m](JMA_03_Statistical_Analyses.m) | Group statistics and visualization on the mean bone (see below). | `Results\` folder with `.tif`, `.mp4` and `.xlsx` files |
-| [JMA_04_Dynamic_Visualization.m](JMA_04_Dynamic_Visualization.m) | Shows group or individual results on the bones while they move. | `.mp4` |
+| [JMA_04_Dynamic_Visualization.m](JMA_04_Dynamic_Visualization.m) | Shows one subject's results as colored beads on the bones while they move. | `Outputs\JMA_04_Videos\<Subject>_<Bone1>_<Bone2>_<Measure>.mp4` |
 
 ## Requirements
 - MATLAB R2019b or newer (developed on R2023a)
@@ -49,6 +49,14 @@ Spelling of bone and group names must match across every file name.
 └── Outputs                          (created by the scripts)
 ```
 
+### Same subjects in several groups
+A within-subject design, with one group folder per condition each containing the same subject folders (e.g. `Shod\BF_011` and `Insole_16\BF_011`), is supported. JMA_01, JMA_01a and JMA_02 keep each subject as `<Group>_<Subject>`, and JMA_02 saves both lists in `subj_group.<Group>`: `SubjectList` holds the folder names and `SubjectKey` holds the keys used in `DataOut`. JMA_03's paired tests match subjects across groups by folder name.
+
+JMA_02 outputs made before this change stored subjects by name only. If two groups shared subject names, both groups ended up with the same data, so re-run JMA_02 for those datasets.
+
+JMA_02 warns if a subject's `Data_*.mat` holds data for a different subject (for example, a file copied in from another folder).
+
+### Mean models
 JMA_03 finds each group's mean model by splitting the file name on `_` and matching both the group name and the bone name. For example, `Shod_Calcaneus.stl` works for group `Shod`, but `Insole_32_Calcaneus.stl` does **not** match group `Insole32`.
 
 ## JMA_03 Analysis Modes
@@ -63,9 +71,12 @@ JMA_03 finds each group's mean model by splitting the file name on `_` and match
 Settings chosen in the first dialog:
 - **Frame Rate**: frame rate of the output `.mp4` (dynamic data only).
 - **Combine statistical analyses** (mode 1): if checked, a particle is significant when either the parametric or the nonparametric test is. If unchecked, only the test that matches the normality result is used.
+- **Plot group difference** (modes 1–2): colors each particle by Group 1 − Group 2 instead of Group 1's value. It uses symmetric default limits and the diverging "difference" colormap, and adds `_diff` to the output folder name.
 - **Minimum percentage of participants** (modes 1, 3, 5): a particle is only tested or drawn if at least this percentage of each group's subjects has data there.
 
-The limits dialog then sets the colorbar range for each measure. It also sets a distance cutoff: particles whose mean distance falls outside the cutoff are left out.
+**Normality (mode 1):** each tested particle/frame is checked with the Shapiro-Francia test. For a paired test the check is on the within-subject differences; otherwise every group must pass. A measure is analyzed as parametric unless more than half of its tested particle/frames fail. The share that passed is printed, and the result names the output folder (e.g. `tTest_paired` vs `SignedRank`, `ANOVA` vs `KruskalWallis`).
+
+The limits dialog then sets the colorbar range for each measure. Its **Flip colormap** checkbox switches between red for low values (unchecked, the default, so red = narrow for distance) and red for high values. The dialog also sets a distance cutoff: particles whose mean distance falls outside the cutoff are left out.
 
 The first figure opens a figure-settings editor for view, colors and glyphs. These settings can be saved to `Outputs\JMA_03_Outputs` and loaded on later runs.
 

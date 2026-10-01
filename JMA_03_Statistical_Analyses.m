@@ -110,6 +110,13 @@ if stats_type == 1
     formats(end+1,:).type   = 'check';
 end
 
+if stats_type <= 2
+    % Plot group 1 minus group 2 instead of group 1's values
+    Prompt(end+1,:)         = {'Plot group difference (Group 1 - Group 2)','PlotDiff',[]};
+    DefAns.PlotDiff         = false;
+    formats(end+1,1).type   = 'check';
+end
+
 if stats_type == 1 || stats_type == 3 || stats_type == 5
     Prompt(end+1,:)         = {'What is the minimum percentage of participants that must be included for each group? (%)','Group',[]};
     DefAns.Group            = '100';
@@ -146,6 +153,8 @@ if stats_type == 4
     norm_raw        = find(strcmp(norm_or_raw,set_inp.NormRaw)); % 1 = normalized, 2 = raw
     alignment_check = set_inp.PartAlign;
 end
+
+plot_difference = stats_type <= 2 && set_inp.PlotDiff;
 
 % Set to 1 in mode 2 if the user loads regions for regional SPM percentages
 SPM_stats_perc = 0;
@@ -271,7 +280,9 @@ elseif stats_type == 4 % Individual, no stats
     subj_list = subj_group.(group_name).SubjectList;
     [indx,~] = listdlg('ListString',subj_list,'Name','Please select participant(s)','ListSize',[500 500]);
 
-    data_1 = string(subj_list(indx)); % selected subject IDs
+    data_1 = string(subj_list(indx)); % selected subject IDs (folder names)
+    subj_keys = localSubjectKeys(subj_group,group_name);
+    data_1_keys = string(subj_keys(indx)); % their field names in DataOut
     pair_list = 1;
 
     % Load each subject's JMA_01 data: the .mat in <data_dir>\<group>\<subject>
@@ -403,36 +414,44 @@ elseif stats_type == 4
     end
 end
 
+% Groups can have different particle counts; only analyze the shared ones
+max_cp = cell(bone_amount,1);
+min_cp = zeros(bone_amount,1);
+for bc = 1:bone_amount
+    for gi = 1:numel(groups)
+        max_cp{bc}(gi) = size(Bone_Data{bc}.DataOut_Mean.(measure_names{1}).(string(groups{gi})), 1);
+    end
+    min_cp(bc) = min(max_cp{bc});
+end
+
 %% Limit Selection
 % Suggest colorbar limits for each selected measure (listdata) and label
 % them with the dataset mean +/- 2 SD (listname), then let the user edit.
 fprintf('Selecting Limits...\n')
 listname = cell(1,length(selected_measures));
 listdata = cell(1,length(selected_measures));
-% The "difference" branch only runs if colormap_choice is set to
-% "difference" here; the figure-settings colormap does not change it.
-colormap_choice = "jet";
-if isequal(colormap_choice,"difference")
+if plot_difference
+    % Group 1 - group 2 of the group means, over every comparison, frame
+    % and particle where both groups have data within the default 0-6
+    % distance cutoff. Limits default to +/- the largest difference so 0
+    % sits at the middle (white) of the diverging colormap.
     for n = selected_measures
-        listname{1,n} = char(measure_names(n));
-
-        A = cell(bone_amount,1);
-        max_diff = zeros(bone_amount,1);
-        min_diff = max_diff;
+        max_abs = 0;
         for b = 1:bone_amount
-            A{b} = zeros(length(Bone_Data{b}.DataOut_Mean.(measure_names{n}).(data_1)),1);
-        end
-        for b = 1:bone_amount
-            for diff_count = 1:length(A{b})
-                if Bone_Data{b}.DataOut_Mean.(measure_names{n}).(data_1)(diff_count,1) <= 6 && Bone_Data{b}.DataOut_Mean.(measure_names{n}).(data_2)(diff_count,1) <= 6
-                    A{b}(diff_count,:) = Bone_Data{b}.DataOut_Mean.(measure_names{n}).(data_1)(diff_count,1)-Bone_Data{b}.DataOut_Mean.(measure_names{n}).(data_2)(diff_count,1);
-                end
+            for pc = 1:size(pair_list,1)
+                grp_1 = char(groups(pair_list(pc,1)));
+                grp_2 = char(groups(pair_list(pc,2)));
+                rows  = 1:min_cp(b);
+                M1 = Bone_Data{b}.DataOut_Mean.(measure_names{n}).(grp_1)(rows,:);
+                M2 = Bone_Data{b}.DataOut_Mean.(measure_names{n}).(grp_2)(rows,:);
+                D1 = Bone_Data{b}.DataOut_Mean.Distance.(grp_1)(rows,:);
+                D2 = Bone_Data{b}.DataOut_Mean.Distance.(grp_2)(rows,:);
+                valid = M1 ~= 0 & M2 ~= 0 & D1 > 0 & D1 <= 6 & D2 > 0 & D2 <= 6;
+                max_abs = max([max_abs; abs(M1(valid) - M2(valid))]);
             end
-            max_diff(b) = max(A{b});
-            min_diff(b) = min(A{b});
         end
-        listdata{n} = char(sprintf('%s %s',num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
-        listname{1,n} = char(sprintf('%s (min = %s , max = %s)',listname{1,n},num2str(min(min_diff),'%.2f'),num2str(max(max_diff),'%.2f')));
+        listdata{n}   = sprintf('%.2f %.2f',-max_abs,max_abs);
+        listname{1,n} = sprintf('%s difference (max |diff| = %.2f)',measure_names{n},max_abs);
     end
 elseif stats_type == 5
     % Percent error is always shown on a fixed 0-100% scale
@@ -471,7 +490,7 @@ for n = [selected_measures selected_measures(end)+1]
         formats(k,1).type                       = 'edit';
         formats(k,1).size                       = [200-length(char(string(listdata{1,n}))) 20];
         k = k + 1;
-        Prompt(end+1,:)                         = {'Flip colormap? Default: red = narrow',sprintf('A%d',k),[]};
+        Prompt(end+1,:)                         = {'Flip colormap? Default: red = low values (narrow)',sprintf('A%d',k),[]};
         formats(k,2).type                       = 'check';
         DefAns.(sprintf('A%d',k))               = false;
         k = k + 1;
@@ -487,9 +506,9 @@ end
 Name   = 'Change Limits: (Lower, Upper)';
 inp_limit = inputsdlg(Prompt,Name,formats,DefAns);
 
-% Colorbar limits and colormap flip, indexed by measure.
-% NOTE: cmapflip is not currently used when plotting; the colormap
-% direction comes from FigSet.ColorMap_Flip (figure settings) instead.
+% Colorbar limits and colormap direction, indexed by measure.
+% cmapflip is passed to RainbowFish_Stitch2 as ColorMap_Flip:
+%   1 = red for low values (default), 2 = red for high values (checked)
 upper_limit = cell(length(measure_names),1);
 lower_limit = cell(length(measure_names),1);
 cmapflip    = cell(length(measure_names),1);
@@ -500,9 +519,9 @@ for n = selected_measures
     lower_limit{n} = str2double(temp{1});
     k = k + 1;
     if isequal(inp_limit.(sprintf('A%d',k)),1)
-        cmapflip{n} = 1;
-    elseif isequal(inp_limit.(sprintf('A%d',k)),0)
         cmapflip{n} = 2;
+    else
+        cmapflip{n} = 1;
     end
     k = k + 1;
 end
@@ -514,15 +533,6 @@ temp = strsplit(inp_limit.(limit_fields{end}),' ');
 Distance_Upper = str2double(temp{2});
 Distance_Lower = str2double(temp{1});
 
-% Groups can have different particle counts; only analyze the shared ones
-max_cp = cell(bone_amount,1);
-min_cp = zeros(bone_amount,1);
-for bc = 1:bone_amount
-    for gi = 1:numel(groups)
-        max_cp{bc}(gi) = size(Bone_Data{bc}.DataOut_Mean.(measure_names{1}).(string(groups{gi})), 1);
-    end
-    min_cp(bc) = min(max_cp{bc});
-end
 
 
 fprintf('Processing...\n')
@@ -531,6 +541,12 @@ fprintf('Processing...\n')
 % Without saved settings, the first figure opens the settings editor.
 [FigSet, FigSetLoaded, FigSetName] = initFigureSettings(data_dir, bone_amount);
 FigSetEditedOnce = false;
+
+% Signed differences need a diverging colormap centered on 0
+if plot_difference && ~any(strcmp(string(FigSet.colormap_choice),["difference" "rudifference"]))
+    fprintf('Group difference selected: using the "difference" colormap\n')
+    FigSet.colormap_choice = 'difference';
+end
 
 %% Statistical Analyses
 % Loop over every comparison in pair_list. Each pass runs that mode's
@@ -559,121 +575,123 @@ for pair_count = 1:size(pair_list,1)
         % At every particle (n) and frame (m), gather each group's subject
         % values and test group 1 vs group 2. Each Results{n,m} holds
         % [parametric p, nonparametric p, normal (1) or not (0)].
+        g1 = find(strcmp(groups,data_1));
+        g2 = find(strcmp(groups,data_2));
+        if paired_data
+            % Paired tests compare the same subject in both groups, so
+            % match subjects by name
+            [~, pair_1, pair_2] = intersect(subj_group.(data_1).SubjectList, subj_group.(data_2).SubjectList, 'stable');
+            if isempty(pair_1)
+                error('Paired data was selected, but %s and %s have no subjects in common.', data_1, data_2);
+            end
+        end
+        % Minimum subjects needed at a particle for it to be tested
+        min_subj_1 = floor(length(subj_group.(data_1).SubjectList)*perc_part/100);
+        min_subj_2 = floor(length(subj_group.(data_2).SubjectList)*perc_part/100);
+
+        for g_count = selected_measures
+            n_tested.(measure_names{g_count}) = 0;
+            n_normal.(measure_names{g_count}) = 0;
+        end
+
         for bone_count = 1:bone_amount
             fprintf('Processing Bone: %s\n',string(Bone_Data{bone_count}.bone_names(1)))
             for g_count = selected_measures
                 measure = measure_names{g_count};
-                not_normal.(measure) = 1;
                 NewBoneData{bone_count}.Results.(measure) = cell(min_cp(bone_count),Bone_Data{bone_count}.max_frames);
-                NewBoneData{bone_count}.Data_All.(measure) = cell(min_cp(bone_count),Bone_Data{bone_count}.max_frames);
 
-                % Look up each subject's data once, outside the particle
-                % and frame loops
-                group_subj_data = cell(1,length(groups));
+                % (particles x frames x subjects) values per group, NaN
+                % where a subject has no data
+                group_vals = cell(1,length(groups));
                 for group_count = 1:length(groups)
-                    group_subj_data{group_count} = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), ...
-                        subj_group.(string(groups(group_count))).SubjectList);
+                    group_vals{group_count} = localSubjectArray(Bone_Data{bone_count}.DataOut.(measure), ...
+                        localSubjectKeys(subj_group,groups(group_count)), min_cp(bone_count), Bone_Data{bone_count}.max_frames);
                 end
-                % Minimum subjects needed at a particle for it to be tested
-                min_subj_1 = floor(length(subj_group.(data_1).SubjectList)*perc_part/100);
-                min_subj_2 = floor(length(subj_group.(data_2).SubjectList)*perc_part/100);
 
                 for n = 1:min_cp(bone_count)
                     for m = 1:Bone_Data{bone_count}.max_frames
-                        % statdata.<group> = that group's values here;
-                        % data_all/agrp_id = all groups pooled, with labels
-                        statdata = struct();
-                        agrp_id  = [];
-                        data_all = [];
+                        % vals{g} = group g's values here (subjects with data)
+                        vals = cell(1,length(groups));
                         for group_count = 1:length(groups)
-                            temp = [];
-                            for subj_count = 1:length(group_subj_data{group_count})
-                                temp = [temp group_subj_data{group_count}{subj_count}{n,m}];
-                            end
-                            temp(isnan(temp)) = [];
-                            statdata.(string(groups(group_count))) = temp;
-                            agrp_id  = [agrp_id repmat(group_count,1,length(temp))];
-                            data_all = [data_all temp];
+                            v = squeeze(group_vals{group_count}(n,m,:))';
+                            vals{group_count} = v(~isnan(v));
+                        end
+                        x = vals{g1};
+                        y = vals{g2};
+                        if paired_data
+                            x_all = squeeze(group_vals{g1}(n,m,pair_1))';
+                            y_all = squeeze(group_vals{g2}(n,m,pair_2))';
+                            both  = ~isnan(x_all) & ~isnan(y_all);
+                            x = x_all(both);
+                            y = y_all(both);
                         end
 
-                        if ~isempty(data_all) && ~isempty(statdata.(data_1)) && ~isempty(statdata.(data_2))
-                            % Shapiro-Francia normality test on the pooled
-                            % data (needs at least 5 values per group)
-                            if length(statdata.(data_1)) >= 5 && length(statdata.(data_2)) >= 5
-                                is_normal = shapiroFranciaTest(data_all);
+                        if length(x) >= min_subj_1 && length(y) >= min_subj_2 && length(x) > 1 && length(y) > 1
+                            % Shapiro-Francia normality on the data each test
+                            % assumes is normal (needs at least 5 values)
+                            if stats1_type == 1 && paired_data
+                                is_normal = localIsNormal({x - y});
+                            elseif stats1_type == 2
+                                is_normal = localIsNormal(vals(~cellfun(@isempty,vals)));
                             else
-                                is_normal = 0;
+                                is_normal = localIsNormal({x, y});
                             end
 
-                            if length(statdata.(data_1)) >= min_subj_1 && length(statdata.(data_2)) >= min_subj_2 ...
-                                    && length(statdata.(data_1)) > 1 && length(statdata.(data_2)) > 1
-                                %% Student's t-Test or Wilcoxon Rank Sum
-                                if stats1_type == 1
-                                    if n == 1 && m == 1
-                                        fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
-                                    end
-                                    test_type = 1;
-                                    if paired_data
-                                        % paired-sample t-test and signed rank test
-                                        [~, pd_parametric]      = ttest(statdata.(data_1),statdata.(data_2),alpha_val);
-                                        [pd_nonparametric, ~, ~] = signrank(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
-                                    else
-                                        % two-sample t-test and Wilcoxon rank sum test
-                                        [~, pd_parametric]      = ttest2(statdata.(data_1),statdata.(data_2),alpha_val);
-                                        [pd_nonparametric, ~, ~] = ranksum(statdata.(data_1),statdata.(data_2),'alpha',alpha_val,'tail','both');
-                                    end
+                            %% Student's t-Test or Wilcoxon Rank Sum
+                            if stats1_type == 1
+                                if paired_data
+                                    % paired-sample t-test and signed rank test
+                                    [~, pd_parametric]      = ttest(x,y,alpha_val);
+                                    [pd_nonparametric, ~, ~] = signrank(x,y,'alpha',alpha_val,'tail','both');
+                                else
+                                    % two-sample t-test and Wilcoxon rank sum test
+                                    [~, pd_parametric]      = ttest2(x,y,alpha_val);
+                                    [pd_nonparametric, ~, ~] = ranksum(x,y,'alpha',alpha_val,'tail','both');
+                                end
 
-                                    if ~isempty(pd_parametric) && ~isempty(pd_nonparametric)
-                                        NewBoneData{bone_count}.Results.(measure){n,m} = [pd_parametric, pd_nonparametric, is_normal];
-                                    end
+                                if ~isempty(pd_parametric) && ~isempty(pd_nonparametric)
+                                    NewBoneData{bone_count}.Results.(measure){n,m} = [pd_parametric, pd_nonparametric, is_normal];
+                                end
 
-                                %% One-way ANOVA or Kruskal-Wallis
-                                elseif stats1_type == 2
-                                    if n == 1 && m == 1
-                                        fprintf('One-way ANOVA or Kruskal-Wallis\n')
-                                    end
-                                    test_type = 2;
-                                    [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
-                                    [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
+                            %% One-way ANOVA or Kruskal-Wallis
+                            elseif stats1_type == 2
+                                % Only groups with data here take part; relabel
+                                % them 1..k so multcompare rows line up
+                                present  = find(~cellfun(@isempty,vals));
+                                data_all = [vals{present}];
+                                agrp_id  = repelem(1:length(present), cellfun(@length,vals(present)));
+                                pair_lo  = find(present == min(g1,g2));
+                                pair_hi  = find(present == max(g1,g2));
 
-                                    % Post-hoc p-value for the selected pair
-                                    % (multcompare lists each pair once, lower index first)
-                                    c = multcompare(pd_parametric,'display','off');
-                                    p_parametric = c(c(:,1) == min(comparison) & c(:,2) == max(comparison),6);
+                                [~, ~, pd_parametric]        = anova1(data_all,agrp_id,'off');
+                                [~, ~, pd_nonparametric]     = kruskalwallis(data_all,agrp_id,'off');
 
-                                    c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
-                                    p_nonparametric = c(c(:,1) == min(comparison) & c(:,2) == max(comparison),6);
+                                % Post-hoc p-value for the selected pair
+                                % (multcompare lists each pair once, lower index first)
+                                c = multcompare(pd_parametric,'display','off');
+                                p_parametric = c(c(:,1) == pair_lo & c(:,2) == pair_hi,6);
 
-                                    NewBoneData{bone_count}.Results.(measure){n,m} = [p_parametric, p_nonparametric, is_normal];
-                                    if is_normal == 0
-                                        not_normal.(measure) = 0;
-                                    end
+                                c = multcompare(pd_nonparametric,'display','off','CriticalValueType','dunn-sidak');
+                                p_nonparametric = c(c(:,1) == pair_lo & c(:,2) == pair_hi,6);
 
-                                %% Hotelling's T2 Test (not offered in the dialog)
-                                elseif stats1_type == 3
-                                    if n == 1 && m == 1
-                                        fprintf('Multivariate Hotelling''s T^2 Test\n')
-                                    end
-                                    test_type = 1;
-                                    data = cell(1,1);
-                                    for id_t = 1:size(statdata.(data_1),2)
-                                        data{1}{id_t} = statdata.(data_1)(id_t);
-                                    end
-                                    for id_t = 1:size(statdata.(data_2),2)
-                                        data{2}{id_t} = statdata.(data_2)(id_t);
-                                    end
-                                    if isempty(pool)
-                                        pool = parpool([1 100]);
-                                    end
-                                    pool.IdleTimeout    = 360;
-                                    p_value_hot         = Compute_PValue_Group_Difference(data,alpha_val,pool);
+                                NewBoneData{bone_count}.Results.(measure){n,m} = [p_parametric, p_nonparametric, is_normal];
 
-                                    if ~isempty(p_value_hot)
-                                        NewBoneData{bone_count}.Results.(measure){n,m} = [p_value_hot, p_value_hot, is_normal];
-                                    end
-                                    clear data
+                            %% Hotelling's T2 Test (not offered in the dialog)
+                            elseif stats1_type == 3
+                                data = {num2cell(x), num2cell(y)};
+                                if isempty(pool)
+                                    pool = parpool([1 100]);
+                                end
+                                pool.IdleTimeout    = 360;
+                                p_value_hot         = Compute_PValue_Group_Difference(data,alpha_val,pool);
+
+                                if ~isempty(p_value_hot)
+                                    NewBoneData{bone_count}.Results.(measure){n,m} = [p_value_hot, p_value_hot, is_normal];
                                 end
                             end
+
+                            n_tested.(measure) = n_tested.(measure) + 1;
+                            n_normal.(measure) = n_normal.(measure) + is_normal;
                         end
                     end
                 end
@@ -681,16 +699,23 @@ for pair_count = 1:size(pair_list,1)
         end
 
         %% Report Normality
-        % normal_flag (from the last selected measure) picks the test name
-        % used for the output folders
-        for n = 1:length(selected_measures)
-            measure = measure_names{selected_measures(n)};
-            if not_normal.(measure) == 0
-                fprintf('Normality Test %s: Nonparametric\n',measure)
-                normal_flag = 0;
-            elseif not_normal.(measure) == 1
-                fprintf('Normality Test %s: Parametric\n',measure)
-                normal_flag = 1;
+        % A measure is analyzed as parametric unless more than half of its
+        % tested particle/frames fail the normality test
+        if stats1_type == 1 && paired_data
+            fprintf('Paired t-Test or Wilcoxon Signed Rank Test\n')
+        elseif stats1_type == 1
+            fprintf('Student''s t-Test or Wilcoxon Rank Sum Test\n')
+        elseif stats1_type == 2
+            fprintf('One-way ANOVA or Kruskal-Wallis\n')
+        end
+        for g_count = selected_measures
+            measure = measure_names{g_count};
+            perc_normal = 100*n_normal.(measure)/max(n_tested.(measure),1);
+            use_parametric.(measure) = perc_normal >= 50;
+            if use_parametric.(measure)
+                fprintf('Normality Test %s: Parametric (%.0f%% of %d tested particle/frames normal)\n',measure,perc_normal,n_tested.(measure))
+            else
+                fprintf('Normality Test %s: Nonparametric (%.0f%% of %d tested particle/frames normal)\n',measure,perc_normal,n_tested.(measure))
             end
         end
     end
@@ -708,17 +733,19 @@ for pair_count = 1:size(pair_list,1)
                 fprintf('Processing Bone (%s): %s\n',measure,string(Bone_Data{bone_count}.bone_names(1)))
                 reg_sig.(measure){bone_count} = {};
 
-                group_subj_data = cell(1,length(groups));
-                for group_count = 1:length(groups)
-                    group_subj_data{group_count} = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), ...
-                        subj_group.(string(groups(group_count))).SubjectList);
-                end
                 min_subj_1 = floor(length(subj_group.(data_1).SubjectList)*perc_part/100);
                 min_subj_2 = floor(length(subj_group.(data_2).SubjectList)*perc_part/100);
 
                 spm_1 = Bone_Data{bone_count}.DataOut_SPM.(measure).(string(data_1));
                 spm_2 = Bone_Data{bone_count}.DataOut_SPM.(measure).(string(data_2));
-                for n = 1:min([length(spm_1) length(spm_2)])
+                n_cp  = min([length(spm_1) length(spm_2)]);
+
+                % Number of subjects with data at each (particle, frame)
+                n_subj_1 = sum(~isnan(localSubjectArray(Bone_Data{bone_count}.DataOut.(measure), ...
+                    localSubjectKeys(subj_group,data_1), n_cp, Bone_Data{bone_count}.max_frames)),3);
+                n_subj_2 = sum(~isnan(localSubjectArray(Bone_Data{bone_count}.DataOut.(measure), ...
+                    localSubjectKeys(subj_group,data_2), n_cp, Bone_Data{bone_count}.max_frames)),3);
+                for n = 1:n_cp
                     clear section1 section2 pperc_stance
                     % Build each group's (subjects x frames) curve at this
                     % particle. Frames without enough data stay 0.
@@ -726,19 +753,8 @@ for pair_count = 1:size(pair_list,1)
                     data2 = [];
 
                     for m = 1:Bone_Data{bone_count}.max_frames
-                        n_subj = zeros(1,length(groups));
-                        for group_count = 1:length(groups)
-                            temp = [];
-                            for subj_count = 1:length(group_subj_data{group_count})
-                                temp = [temp group_subj_data{group_count}{subj_count}{n,m}];
-                            end
-                            n_subj(group_count) = sum(~isnan(temp));
-                        end
-                        n_subj_1 = n_subj(strcmp(groups,data_1));
-                        n_subj_2 = n_subj(strcmp(groups,data_2));
-
-                        if length(groups) == 2 && n_subj_1 >= min_subj_1 && n_subj_2 >= min_subj_2 ...
-                                && n_subj_1 > 1 && n_subj_2 > 1
+                        if length(groups) == 2 && n_subj_1(n,m) >= min_subj_1 && n_subj_2(n,m) >= min_subj_2 ...
+                                && n_subj_1(n,m) > 1 && n_subj_2(n,m) > 1
                             data1(:,m) = cell2mat(spm_1{n,m});
                             data2(:,m) = cell2mat(spm_2{n,m});
                         end
@@ -789,29 +805,10 @@ for pair_count = 1:size(pair_list,1)
     end
 
     %% Name Figures
-    % Output folders are named <test_name>_<measure>_<bone_comparison_name>
-    if isequal(stats_type,1)
-        if isequal(normal_flag,0)
-            if isequal(test_type,1)
-                test_name = 'RankSum';
-            elseif isequal(test_type,2)
-                test_name = 'KruskalWallis';
-            elseif isequal(test_type,3)
-                test_name = 'Combined';
-            end
-        elseif isequal(normal_flag,1)
-            if isequal(test_type,1)
-                test_name = 'tTest';
-                if paired_data
-                    test_name = strcat(test_name,'_paired');
-                end
-            elseif isequal(test_type,2)
-                test_name = 'ANOVA';
-            elseif isequal(test_type,3)
-                test_name = 'Combined';
-            end
-        end
-    elseif isequal(stats_type,2)
+    % Output folders are named <test_name>_<measure>_<bone_comparison_name>.
+    % In mode 1 the test name depends on each measure's normality result,
+    % so it is set per measure when plotting (localStatsNames).
+    if isequal(stats_type,2)
         test_name = 'SPM';
         if paired_data
             test_name = strcat(test_name,'_paired');
@@ -841,17 +838,11 @@ for pair_count = 1:size(pair_list,1)
     end
 
     if ~isequal(additional_name,'')
-        bone_comparison_name= strcat(additional_name,strcat('_',bone_comparison_name));
-        if exist('normal_flag','var') == 1
-            if isequal(normal_flag,1)
-                bone_comparison_name = strcat(bone_comparison_name,'_Parametric');
-            elseif ~isequal(normal_flag,1)
-                bone_comparison_name = strcat(bone_comparison_name,'_NonParametric');
-            end
-        end
+        bone_comparison_name = strcat(additional_name,strcat('_',bone_comparison_name));
     end
+    bone_comparison_base = bone_comparison_name;
 
-    if isequal(colormap_choice,'difference')
+    if plot_difference
         bone_comparison_name = strcat(bone_comparison_name,'_diff');
     end
 
@@ -877,6 +868,12 @@ for pair_count = 1:size(pair_list,1)
         for plot_data = selected_measures
             measure = measure_names{plot_data};
             N_length = []; % frames that produced a figure (used for the video)
+            if stats_type == 1
+                [test_name, bone_comparison_name] = localStatsNames(test_type, paired_data, ...
+                    use_parametric.(measure), bone_comparison_base, additional_name, plot_difference);
+            end
+            % Colormap direction comes from the limits dialog checkbox
+            FigSet.ColorMap_Flip = cmapflip{plot_data};
 
             %% Create directory to save .tif images
             tif_folder = sprintf('%s\\Results\\%s_%s_%s\\%s_%s_vs_%s\\',data_dir,test_name,measure,bone_comparison_name,measure,string(groups(comparison(1))),string(groups(comparison(2))));
@@ -897,10 +894,12 @@ for pair_count = 1:size(pair_list,1)
 
                         % Each subject's values for this measure, plus
                         % distance (used for the distance cutoff)
-                        vals_1 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure),  subj_group.(data_1).SubjectList);
-                        dist_1 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,   subj_group.(data_1).SubjectList);
-                        vals_2 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure),  subj_group.(data_2).SubjectList);
-                        dist_2 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,   subj_group.(data_2).SubjectList);
+                        keys_1 = localSubjectKeys(subj_group,data_1);
+                        keys_2 = localSubjectKeys(subj_group,data_2);
+                        vals_1 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), keys_1);
+                        dist_1 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,  keys_1);
+                        vals_2 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), keys_2);
+                        dist_2 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,  keys_2);
                         min_subj_1 = floor(length(subj_group.(data_1).SubjectList)*(perc_part/100));
                         min_subj_2 = floor(length(subj_group.(data_2).SubjectList)*(perc_part/100));
 
@@ -916,7 +915,7 @@ for pair_count = 1:size(pair_list,1)
                                 if mean(datd_cons1) <= Distance_Upper && mean(datd_cons1) >= Distance_Lower && mean(datd_cons2) <= Distance_Upper && mean(datd_cons2) >= Distance_Lower...
                                         && length(data_cons1) >= min_subj_1 && length(data_cons2) >= min_subj_2
                                     NodalIndex{bone_count}(k,:) = m;
-                                    if ~isequal(colormap_choice,'difference')
+                                    if ~plot_difference
                                         NodalData{bone_count}(k,:) = mean(data_cons1);
                                     else
                                         NodalData{bone_count}(k,:) = mean(data_cons1) - mean(data_cons2);
@@ -937,11 +936,11 @@ for pair_count = 1:size(pair_list,1)
                                         f = f + 1;
                                     end
                                 else
-                                    if not_normal.(measure)      == 0 && a(2) <= alpha_val
+                                    if ~use_parametric.(measure) && a(2) <= alpha_val
                                         reg_sig{bone_count}(f)      = a(2);
                                         SPM_index{bone_count}(f)    = m;
                                         f = f + 1;
-                                    elseif not_normal.(measure)  == 1 && a(1) <= alpha_val
+                                    elseif use_parametric.(measure) && a(1) <= alpha_val
                                         reg_sig{bone_count}(f)      = a(1);
                                         SPM_index{bone_count}(f)    = m;
                                         f = f + 1;
@@ -957,6 +956,7 @@ for pair_count = 1:size(pair_list,1)
                         NodalIndex{bone_count}  = [];
                         NodalData{bone_count}   = [];
                         mean_1  = Bone_Data{bone_count}.DataOut_Mean.(measure).(string(data_1));
+                        mean_2  = Bone_Data{bone_count}.DataOut_Mean.(measure).(string(data_2));
                         dist_1  = Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_1));
                         dist_2  = Bone_Data{bone_count}.DataOut_Mean.Distance.(string(data_2));
                         spm_1   = Bone_Data{bone_count}.DataOut_SPM.(measure).(string(data_1));
@@ -977,7 +977,11 @@ for pair_count = 1:size(pair_list,1)
                                 % misrepresenting the data.
                                 if length(cell2mat(spm_1{m,n})) == n_subj_1 && length(cell2mat(spm_2{m,n})) == n_subj_2
                                     NodalIndex{bone_count}(k,:) = m;
-                                    NodalData{bone_count}(k,:)  = mean_1(m,n);
+                                    if ~plot_difference
+                                        NodalData{bone_count}(k,:)  = mean_1(m,n);
+                                    else
+                                        NodalData{bone_count}(k,:)  = mean_1(m,n) - mean_2(m,n);
+                                    end
                                     k = k + 1;
                                 end
                             end
@@ -1251,6 +1255,7 @@ for pair_count = 1:size(pair_list,1)
             mkdir(tif_folder);
 
             CLimits = [lower_limit{plot_data} upper_limit{plot_data}];
+            FigSet.ColorMap_Flip = cmapflip{plot_data};
 
             for n = 1:Bone_Data{1}.max_frames
                 for bone_count = 1:bone_amount
@@ -1258,8 +1263,8 @@ for pair_count = 1:size(pair_list,1)
                     NodalData{bone_count}   = {};
                     SPM_index{bone_count}   = [];
 
-                    vals_1 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), subj_group.(group).SubjectList);
-                    dist_1 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,  subj_group.(group).SubjectList);
+                    vals_1 = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), localSubjectKeys(subj_group,group));
+                    dist_1 = localSubjectData(Bone_Data{bone_count}.DataOut.Distance,  localSubjectKeys(subj_group,group));
                     min_subj_1 = floor(length(subj_group.(group).SubjectList)*(perc_part/100));
 
                     temp = []; % [particle, group mean]
@@ -1341,6 +1346,7 @@ for pair_count = 1:size(pair_list,1)
                 mkdir(tif_folder);
 
                 CLimits = [lower_limit{plot_data} upper_limit{plot_data}];
+                FigSet.ColorMap_Flip = cmapflip{plot_data};
 
                 for n = 1:frame_count_ind
                     for bone_count = 1:bone_amount
@@ -1353,7 +1359,7 @@ for pair_count = 1:size(pair_list,1)
                         if norm_raw == 1
                             % Note: the distance cutoff is applied to this
                             % measure's own value here
-                            subj_vals = Bone_Data{bone_count}.DataOut.(measure).(subj);
+                            subj_vals = Bone_Data{bone_count}.DataOut.(measure).(data_1_keys(subj_count));
                             temp = []; % [particle, value]
                             k = 1;
                             for m = 1:length(subj_vals(:,1))
@@ -1432,6 +1438,7 @@ for pair_count = 1:size(pair_list,1)
             mkdir(tif_folder);
 
             CLimits = [lower_limit{plot_data} upper_limit{plot_data}];
+            FigSet.ColorMap_Flip = cmapflip{plot_data};
 
             for n = 1:Bone_Data{1}.max_frames
                 for bone_count = 1:bone_amount
@@ -1439,7 +1446,7 @@ for pair_count = 1:size(pair_list,1)
                     NodalData{bone_count}   = {};
                     SPM_index{bone_count}   = [];
 
-                    subj_list = subj_group.(group).SubjectList;
+                    subj_list = localSubjectKeys(subj_group,group);
                     vals_1  = localSubjectData(Bone_Data{bone_count}.DataOut.(measure), subj_list);
                     vals_gt = localSubjectData(Bone_Data{bone_count}.DataOut.(measure_names{groundtruth_measure}), subj_list);
                     dist_1  = localSubjectData(Bone_Data{bone_count}.DataOut.Distance, subj_list);
@@ -1533,7 +1540,7 @@ if Bone_Data{1}.max_frames == 1
     X = cell(1,1);
     V = cell(1,1);
     for g_count = 1:length(group_names)
-        subj_list = Bone_Data{1,1}.subj_group.(group_names{g_count}).SubjectList;
+        subj_list = localSubjectKeys(Bone_Data{1,1}.subj_group,group_names{g_count});
         X{g_count} = [];
         for subj_count = 1:length(subj_list)
             X{g_count} = [X{g_count}; cell2mat(Bone_Data{1,1}.DataOut.Distance.(subj_list{subj_count}))];
@@ -1585,5 +1592,64 @@ for s = 1:length(subj_vals)
         dists(ss) = subj_dists{s}{m,n};
         ss = ss + 1;
     end
+end
+end
+
+function A = localSubjectArray(measure_data, subj_keys, n_cp, n_frames)
+% (particles x frames x subjects) array of one measure for a list of
+% subjects, with NaN wherever a subject has no value
+A = nan(n_cp, n_frames, length(subj_keys));
+for s = 1:length(subj_keys)
+    C = measure_data.(char(subj_keys(s)))(1:n_cp,1:n_frames);
+    filled = ~cellfun(@isempty,C);
+    vals = nan(n_cp,n_frames);
+    vals(filled) = [C{filled}];
+    A(:,:,s) = vals;
+end
+end
+
+function keys = localSubjectKeys(subj_group, group)
+% Field names of a group's subjects in DataOut. JMA_02 stores them as
+% <Group>_<Subject> (SubjectKey) so the same subject can appear in several
+% groups; older JMA_02 files used the subject name alone.
+G = subj_group.(char(group));
+if isfield(G,'SubjectKey')
+    keys = cellstr(G.SubjectKey);
+else
+    keys = cellstr(G.SubjectList);
+end
+end
+
+function is_normal = localIsNormal(samples)
+% 1 if every sample in the cell array has at least 5 values and passes the
+% Shapiro-Francia normality test, otherwise 0
+is_normal = 1;
+for k = 1:length(samples)
+    if length(samples{k}) < 5 || ~shapiroFranciaTest(samples{k})
+        is_normal = 0;
+        return
+    end
+end
+end
+
+function [test_name, bone_comparison_name] = localStatsNames(test_type, paired_data, use_parametric, bone_comparison_base, additional_name, plot_difference)
+% Mode 1 output names, based on the test used for this measure
+if test_type == 1 && paired_data
+    names = {'tTest_paired','SignedRank'};
+elseif test_type == 1
+    names = {'tTest','RankSum'};
+else
+    names = {'ANOVA','KruskalWallis'};
+end
+test_name = names{2 - use_parametric};
+
+bone_comparison_name = bone_comparison_base;
+if ~isequal(additional_name,'')
+    % With a custom name, the test family is added as well
+    suffix = {'_NonParametric','_Parametric'};
+    bone_comparison_name = strcat(bone_comparison_name,suffix{1 + use_parametric});
+end
+if plot_difference
+    bone_comparison_name = strcat(bone_comparison_name,'_diff');
 end
 end
